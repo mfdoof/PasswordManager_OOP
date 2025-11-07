@@ -16,6 +16,7 @@ Run
 1. Open the project in IntelliJ IDEA. 2. Run com.doof.passwordmanager.app.Main. 3. On first launch: create or unlock the master vault. 4. Access the dashboard after unlocking.
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 SSL/TLS Connection Requirement
 
 This application uses an SSL/TLS-secured connection to communicate with the MySQL database.
