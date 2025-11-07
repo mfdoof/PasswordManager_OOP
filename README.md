@@ -27,3 +27,26 @@ Most MySQL installations already include built-in support for SSL/TLS. If you ar
 The application is already configured to use SSL by default through the connection URL specified in ConnectionManager.java. The connection string includes the parameter sslMode=VERIFY_IDENTITY, which enforces secure communication and verifies the identity of the MySQL server. No additional setup is required within the application code; as long as your MySQL server has SSL enabled, the connection will automatically be encrypted and verified.
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+!Known Limitations and What’s Missing!
+
+UI does not yet display Created At and Updated At timestamps for accounts.
+
+No confirmation dialogs after adding, updating, or deleting entries.
+
+Limited error and validation messages displayed in the UI (handled internally only).
+
+Search and filtering features are basic and can be improved for usability.
+
+Show Password button could include an auto-hide or copy-to-clipboard with timeout feature.
+
+Minimal UI design — lacks theming, spacing adjustments, and dark mode support.
+
+Database connection errors show generic messages; could use more descriptive ones.
+
+No export or backup feature for encrypted account data.
+
+No dedicated config file for customizing DB credentials or timeout settings.
+
+No logging system for tracking actions, vault status, or database issues.
