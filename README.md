@@ -15,3 +15,14 @@ create a dedicated MySQL user for the app.
 Run
 1. Open the project in IntelliJ IDEA. 2. Run com.doof.passwordmanager.app.Main. 3. On first launch: create or unlock the master vault. 4. Access the dashboard after unlocking.
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+SSL/TLS Connection Requirement
+
+This application uses an SSL/TLS-secured connection to communicate with the MySQL database.
+Before running the program, make sure that SSL is enabled in your local MySQL server. When SSL is active, all data transferred between the application and the database is encrypted, ensuring that sensitive information such as account credentials remains protected.
+
+Most MySQL installations already include built-in support for SSL/TLS. If you are setting up a new MySQL instance, you can enable SSL using the default configuration or by generating the required certificates during installation. Each user can create their own local certificates — there is no need to share any certificate files between systems.
+
+The application is already configured to use SSL by default through the connection URL specified in ConnectionManager.java. The connection string includes the parameter sslMode=VERIFY_IDENTITY, which enforces secure communication and verifies the identity of the MySQL server. No additional setup is required within the application code; as long as your MySQL server has SSL enabled, the connection will automatically be encrypted and verified.
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
