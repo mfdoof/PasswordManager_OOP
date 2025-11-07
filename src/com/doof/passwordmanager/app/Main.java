@@ -254,7 +254,6 @@ public class Main {
                             frame.setVisible(false);
                             Dashboard d = new Dashboard(appConnector);
                             d.setOnClose(() -> SwingUtilities.invokeLater(() -> {
-                                // reset unlock fields for a clean state
                                 unlockPasswordField.setText("");
                                 unlockErrorLabel.setText("");
                                 cardLayout.show(rootPanel, CARD_UNLOCK);

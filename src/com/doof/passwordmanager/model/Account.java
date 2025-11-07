@@ -7,9 +7,9 @@ public class Account {
     private String email;
     private String website;
 
-    private byte[] passwordEncrypted;  // stores the AES-GCM ciphertext
-    private byte[] iv;                 // stores the 12-byte initialization vector
-    private int encVersion;            // version of encryption scheme
+    private byte[] passwordEncrypted;
+    private byte[] iv;
+    private int encVersion;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -37,7 +37,6 @@ public class Account {
         this.encVersion = encVersion;
     }
 
-    // --- Getters and Setters ---
 
     public int getId() {
         return id;
