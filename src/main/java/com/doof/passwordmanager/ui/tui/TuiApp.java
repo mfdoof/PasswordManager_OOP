@@ -107,7 +107,7 @@ public final class TuiApp {
                 if (key != null) {
                     manager.handleKey(key);
                 }
-                if (ctx.clipboard.tick(ctx.now())) {
+                if (ctx.tick(ctx.now())) {
                     manager.markDirty();
                 }
                 manager.tick(ctx.now());

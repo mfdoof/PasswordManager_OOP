@@ -295,12 +295,18 @@ public final class EntryModal implements TuiScreen {
         wipe();
     }
 
+    private long lastSessionSecond = -1;
+
     @Override
     public boolean tick(long nowMillis) {
         if (!ctx.connector.isUnlocked()) {  // auto-lock while the form is open: close it, wipe everything
             wipe();
-            ctx.clipboard.clearNow();
-            ctx.show(new UnlockScreen(ctx, "ok: vault auto-locked"));
+            ctx.lockToUnlock(VaultScreen.AUTO_LOCKED);
+            return true;
+        }
+        long second = parent.sessionSecond();  // keep the header countdown behind the form ticking
+        if (second != lastSessionSecond) {
+            lastSessionSecond = second;
             return true;
         }
         return false;

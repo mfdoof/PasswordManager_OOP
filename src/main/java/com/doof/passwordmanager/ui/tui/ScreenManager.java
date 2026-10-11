@@ -24,6 +24,8 @@ public final class ScreenManager {
     private TuiScreen current;
     private boolean quitRequested;
     private boolean dirty = true;
+    private boolean fullClear;
+    private Runnable activityListener = () -> { };
 
     public ScreenManager(Screen screen, Theme theme, TuiScreen initial) {
         this.screen = Objects.requireNonNull(screen);
@@ -41,11 +43,23 @@ public final class ScreenManager {
         dirty = true;
     }
 
+    /** Called on every keypress (resets the idle auto-lock timer). */
+    public void setActivityListener(Runnable listener) {
+        this.activityListener = Objects.requireNonNull(listener);
+    }
+
+    /** Next render blanks the whole terminal first (lock: nothing from the vault view may remain). */
+    public void requestFullClear() {
+        fullClear = true;
+        dirty = true;
+    }
+
     public TuiScreen current() {
         return current;
     }
 
     public void handleKey(KeyStroke key) {
+        activityListener.run();
         // Raw mode: Ctrl+C arrives as a key, not a signal. Treat it (and EOF) as quit everywhere.
         if (key.getKeyType() == KeyType.EOF
                 || (key.isCtrlDown() && key.getCharacter() != null && Character.toLowerCase(key.getCharacter()) == 'c')) {
@@ -85,6 +99,11 @@ public final class ScreenManager {
 
     public void render() throws IOException {
         dirty = false;
+        boolean complete = fullClear;
+        if (fullClear) {
+            fullClear = false;
+            screen.clear();
+        }
         TerminalSize size = screen.getTerminalSize();
         TextGraphics g = screen.newTextGraphics();
         g.setBackgroundColor(theme.background);
@@ -96,7 +115,7 @@ public final class ScreenManager {
             current.draw(g, size, theme);
         }
         screen.setCursorPosition(null);
-        screen.refresh();
+        screen.refresh(complete ? Screen.RefreshType.COMPLETE : Screen.RefreshType.AUTOMATIC);
     }
 
     /** Wipes the current screen's secrets and blanks the terminal (quit). */

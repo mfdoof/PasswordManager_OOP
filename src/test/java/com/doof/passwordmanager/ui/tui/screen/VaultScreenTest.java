@@ -247,13 +247,14 @@ class VaultScreenTest {
     }
 
     @Test
-    void notYetBuiltKeysShowAnErrorUntilTheNextKey() {
+    void errorsStayUntilTheNextKey() {
+        add("github.com", "mave");
         open();
-        h.type("p");
-        assertTrue(h.text().contains("err: [p] change password is not available yet"), h.text());
+        h.type("d");  // the delete prompt is an err: status
+        assertTrue(h.text().contains("err: delete github.com (mave)? [y/N]"));
         h.advance(60_000);
-        assertTrue(h.text().contains("err: [p] change password is not available yet"), "errors do not time out");
-        h.type("j");
+        assertTrue(h.text().contains("err: delete github.com"), "errors do not time out");
+        h.type("n");
         assertFalse(h.text().contains("err:"));
     }
 
@@ -270,8 +271,9 @@ class VaultScreenTest {
         String s = h.text();
         for (HelpOverlay.KeyHelp k : HelpOverlay.KEYS) {
             assertTrue(s.contains(k.keys()), k.keys());
-            assertTrue(s.contains(k.action() + (k.built() ? "" : " (soon)")), k.action());
+            assertTrue(s.contains(k.action()), k.action());
         }
+        assertFalse(s.contains("(soon)"), "every key is built");
         assertTrue(s.contains("any key closes"));
 
         h.type("x");
@@ -300,7 +302,7 @@ class VaultScreenTest {
         h.connector.lockVault();
         h.tick();
         assertInstanceOf(UnlockScreen.class, h.manager.current());
-        assertTrue(h.text().contains("ok: vault auto-locked"));
+        assertTrue(h.text().contains("ok: auto-locked after 5 min idle"));
     }
 
     @Test

@@ -207,10 +207,9 @@ class RevealCopyTest {
     void helpNoLongerMarksTheseKeysSoon() {
         h.type("?");
         String s = h.text();
-        assertTrue(s.contains("reveal password 10s") && !s.contains("reveal password 10s (soon)"));
-        assertTrue(s.contains("copy password (20s clear)") && !s.contains("copy password (20s clear) (soon)"));
-        assertTrue(s.contains("copy username") && !s.contains("copy username (soon)"));
-        assertTrue(s.contains("show notes") && !s.contains("show notes (soon)"));
+        assertTrue(s.contains("reveal password 10s") && s.contains("copy password (20s clear)"));
+        assertTrue(s.contains("copy username") && s.contains("show notes"));
+        assertFalse(s.contains("(soon)"));
         h.type("x");
         assertTrue(h.text().contains("[s] reveal  [c] copy  [u] copy user"));
         assertTrue(h.text().contains("[n] show notes"));

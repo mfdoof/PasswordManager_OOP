@@ -4,8 +4,8 @@ import com.doof.passwordmanager.ui.tui.Draw;
 import com.doof.passwordmanager.ui.tui.Theme;
 import com.doof.passwordmanager.ui.tui.TuiContext;
 import com.doof.passwordmanager.ui.tui.TuiScreen;
+import com.doof.passwordmanager.ui.tui.widget.PolicyView;
 import com.doof.passwordmanager.ui.tui.widget.SecretField;
-import com.doof.passwordmanager.ui.tui.widget.StrengthMeter;
 import com.doof.passwordmanager.util.PasswordPolicy;
 import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.graphics.TextGraphics;
@@ -145,18 +145,7 @@ public final class CreateScreen implements TuiScreen {
 
         char[] pw = password.peek();
         try {
-            StrengthMeter.Level level = StrengthMeter.level(pw);
-            g.setForegroundColor(t.dim);
-            g.putString(col + 4, top + 5, "strength ");
-            g.setForegroundColor(level.compareTo(StrengthMeter.Level.STRONG) >= 0 ? t.success
-                    : level.compareTo(StrengthMeter.Level.FAIR) <= 0 && level != StrengthMeter.Level.NONE ? t.error : t.text);
-            g.putString(col + 13, top + 5, StrengthMeter.bar(pw) + " " + level.label);
-
-            PasswordPolicy.Checks c = PasswordPolicy.check(pw);
-            g.setForegroundColor(t.text);
-            g.putString(col + 4, top + 6, box(c.length) + " " + PasswordPolicy.MASTER_MIN_LENGTH + "+ chars  "
-                    + box(c.upper) + " upper  " + box(c.lower) + " lower");
-            g.putString(col + 4, top + 7, box(c.digit) + " digit      " + box(c.symbol) + " symbol (optional)");
+            PolicyView.draw(g, t, col + 4, top + 5, pw);
         } finally {
             Arrays.fill(pw, '\0');
         }
@@ -183,10 +172,6 @@ public final class CreateScreen implements TuiScreen {
             g.setForegroundColor(t.primary);
             g.putString(col + prompt.length() + stars.length(), row, "_");
         }
-    }
-
-    private static String box(boolean checked) {
-        return checked ? "[x]" : "[ ]";
     }
 
     @Override

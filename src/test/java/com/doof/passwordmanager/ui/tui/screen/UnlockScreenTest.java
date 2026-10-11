@@ -160,7 +160,7 @@ class UnlockScreenTest {
         h.connector.lockVault();  // what VaultService's auto-lock timer does
         h.tick();
         assertInstanceOf(UnlockScreen.class, h.manager.current());
-        assertTrue(h.text().contains("ok: vault auto-locked"));
+        assertTrue(h.text().contains("ok: auto-locked after 5 min idle"));
     }
 
     @Test

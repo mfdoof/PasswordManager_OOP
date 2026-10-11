@@ -39,6 +39,32 @@ public final class TuiContext {
 
     void attach(ScreenManager manager) {
         this.manager = manager;
+        manager.setActivityListener(connector::resetSessionTimer);
+    }
+
+    /**
+     * Once per loop iteration: clears the clipboard when due and locks the vault when the idle
+     * timeout has run out (screens then see the vault locked and return to Unlock).
+     * Returns true if a redraw is needed.
+     */
+    public boolean tick(long now) {
+        boolean changed = clipboard.tick(now);
+        if (connector.isUnlocked() && connector.getSessionRemainingMs() <= 0) {
+            connector.lockVault();
+            changed = true;
+        }
+        return changed;
+    }
+
+    /**
+     * The one way back to Unlock: clears a copied password, locks (wiping keys), wipes the
+     * current screen's secrets, blanks the terminal and shows Unlock with {@code notice}.
+     */
+    public void lockToUnlock(String notice) {
+        clipboard.clearNow();
+        connector.lockVault();
+        manager.requestFullClear();
+        manager.show(new com.doof.passwordmanager.ui.tui.screen.UnlockScreen(this, notice));
     }
 
     public void show(TuiScreen screen) {

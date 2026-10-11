@@ -13,29 +13,28 @@ import java.util.List;
 /** {@code ?} overlay listing every key from docs/TUI_DESIGN.md §4. Any key closes it. */
 public final class HelpOverlay implements TuiScreen {
 
-    /** One row of the key table; {@code built} = false is shown as "(soon)". */
-    record KeyHelp(String keys, String action, boolean built) {}
+    /** One row of the key table. */
+    record KeyHelp(String keys, String action) {}
 
     static final List<KeyHelp> KEYS = List.of(
-            new KeyHelp("j / k, arrows", "move selection", true),
-            new KeyHelp("g g / G", "first / last entry", true),
-            new KeyHelp("/", "search; ESC clears it", true),
-            new KeyHelp("a / e / d", "add / edit / delete", true),
-            new KeyHelp("s", "reveal password 10s", true),
-            new KeyHelp("c", "copy password (20s clear)", true),
-            new KeyHelp("u", "copy username", true),
-            new KeyHelp("n", "show notes", true),
-            new KeyHelp("p", "change master password", false),
-            new KeyHelp("l", "lock now", true),
-            new KeyHelp("?", "this help", true),
-            new KeyHelp("q", "quit (clears screen, wipes keys)", true),
-            new KeyHelp("TAB / shift+TAB", "next / previous field", true),
-            new KeyHelp("g / ctrl+g", "generate password (entry form)", true),
-            new KeyHelp("v / ctrl+v", "show / hide password (entry form)", true),
-            new KeyHelp("ENTER / ESC", "confirm / cancel", true));
+            new KeyHelp("j / k, arrows", "move selection"),
+            new KeyHelp("g g / G", "first / last entry"),
+            new KeyHelp("/", "search; ESC clears it"),
+            new KeyHelp("a / e / d", "add / edit / delete"),
+            new KeyHelp("s", "reveal password 10s"),
+            new KeyHelp("c", "copy password (20s clear)"),
+            new KeyHelp("u", "copy username"),
+            new KeyHelp("n", "show notes"),
+            new KeyHelp("p", "change master password"),
+            new KeyHelp("l", "lock now"),
+            new KeyHelp("?", "this help"),
+            new KeyHelp("q", "quit (clears screen, wipes keys)"),
+            new KeyHelp("TAB / shift+TAB", "next / previous field"),
+            new KeyHelp("g / ctrl+g", "generate password (entry form)"),
+            new KeyHelp("v / ctrl+v", "show / hide password (entry form)"),
+            new KeyHelp("ENTER / ESC", "confirm / cancel"));
 
-    static final String SOON = "(soon)";
-    static final String FOOTER = "any key closes    " + SOON + " = not built yet";
+    static final String FOOTER = "any key closes";
     private static final int KEY_COL = 18;
     private static final int WIDTH = 64;
 
@@ -75,10 +74,10 @@ public final class HelpOverlay implements TuiScreen {
         for (int i = 0; i < KEYS.size(); i++) {
             KeyHelp k = KEYS.get(i);
             int r = row + 1 + i;
-            g.setForegroundColor(k.built() ? t.primary : t.dim);
+            g.setForegroundColor(t.primary);
             g.putString(col + 2, r, k.keys());
-            g.setForegroundColor(k.built() ? t.text : t.dim);
-            g.putString(col + 2 + KEY_COL, r, k.action() + (k.built() ? "" : " " + SOON));
+            g.setForegroundColor(t.text);
+            g.putString(col + 2 + KEY_COL, r, k.action());
         }
         g.setForegroundColor(t.dim);
         g.putString(col + 2, row + h - 2, FOOTER);

@@ -92,7 +92,7 @@ public final class TuiHarness {
 
     /** One loop iteration without input: tick + render. */
     public void tick() {
-        if (ctx.clipboard.tick(clock.millis())) {
+        if (ctx.tick(clock.millis())) {
             manager.markDirty();
         }
         manager.tick(clock.millis());

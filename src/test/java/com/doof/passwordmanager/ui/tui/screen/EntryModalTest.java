@@ -369,7 +369,7 @@ class EntryModalTest {
         h.connector.lockVault();
         h.tick();
         assertInstanceOf(UnlockScreen.class, h.manager.current());
-        assertTrue(h.text().contains("ok: vault auto-locked"));
+        assertTrue(h.text().contains("ok: auto-locked after 5 min idle"));
         assertEquals(0, m.passwordField().length());
         assertEquals(0, m.notesField().length());
     }
@@ -378,8 +378,8 @@ class EntryModalTest {
     void helpShowsTheseKeysAsBuilt() {
         h.type("?");
         String s = h.text();
-        assertTrue(s.contains("add / edit / delete") && !s.contains("add / edit / delete (soon)"));
-        assertTrue(s.contains("generate password (entry form)") && !s.contains("(entry form) (soon)"));
-        assertTrue(s.contains("change master password (soon)"), "p is still to come");
+        assertTrue(s.contains("add / edit / delete") && s.contains("generate password (entry form)"));
+        assertTrue(s.contains("change master password"));
+        assertFalse(s.contains("(soon)"));
     }
 }

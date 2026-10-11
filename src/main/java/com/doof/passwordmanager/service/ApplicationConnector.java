@@ -75,6 +75,11 @@ public class ApplicationConnector {
         } catch (Exception ignored) { }
     }
 
+    /** Idle time left before auto-lock in ms; 0 when locked or expired. */
+    public long getSessionRemainingMs() {
+        return vaultService.sessionRemainingMs();
+    }
+
 
     /** Site + user of every entry; no passwords. */
     public List<EntrySummary> listEntries() {

@@ -46,7 +46,9 @@ class VaultService {
     private final Object keyLock = new Object();
     private byte[] encKey;                // guarded by keyLock
     private VaultMetadata cachedMetadata; // guarded by keyLock
-    private final long sessionTimeoutMs = 5 * 60 * 1000L;
+    /** Idle time before auto-lock (ARCHITECTURE §8). */
+    static final long SESSION_TIMEOUT_MS = 5 * 60 * 1000L;
+    private volatile long lastActivityAt;  // clock millis of unlock or last activity
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "doof-autolock");
         t.setDaemon(true);  // must not keep the JVM alive after the app exits
@@ -313,12 +315,13 @@ class VaultService {
             encKey = key;
             cachedMetadata = metadata;
         }
+        lastActivityAt = clock.millis();
         startAutoLockTimer();
     }
 
     private synchronized void startAutoLockTimer() {
         cancelAutoLockTimer();
-        autoLockTask = scheduler.schedule(this::lockVault, sessionTimeoutMs, TimeUnit.MILLISECONDS);
+        autoLockTask = scheduler.schedule(this::lockVault, SESSION_TIMEOUT_MS, TimeUnit.MILLISECONDS);
     }
 
     private synchronized void cancelAutoLockTimer() {
@@ -328,9 +331,20 @@ class VaultService {
         autoLockTask = null;
     }
 
+    /** Records activity: restarts the idle timeout. No effect while locked. */
     void resetSessionTimer() {
         if (isUnlocked()) {
+            lastActivityAt = clock.millis();
             startAutoLockTimer();
         }
+    }
+
+    /**
+     * Idle time left before auto-lock, by the injectable clock (0 when locked or expired). The UI
+     * uses this for its countdown and locks at 0; the scheduled task above is a real-time safety net.
+     */
+    long sessionRemainingMs() {
+        if (!isUnlocked()) return 0;
+        return Math.max(0, lastActivityAt + SESSION_TIMEOUT_MS - clock.millis());
     }
 }

@@ -41,11 +41,23 @@ public final class InputValidator {
         }
     }
 
+    static final int MAX_WEBSITE_LENGTH = 253;  // longest DNS name
+
+    /** Site: non-empty, at most 253 chars, no whitespace or control characters, parses as a URL host. */
     public static void validateWebsite(String website) {
         if (website == null || website.trim().isEmpty()) {
             throw new ValidationException("Website cannot be empty.");
         }
         website = website.trim();
+        if (website.length() > MAX_WEBSITE_LENGTH) {
+            throw new ValidationException("Website is too long (max " + MAX_WEBSITE_LENGTH + " characters).");
+        }
+        for (int i = 0; i < website.length(); i++) {
+            char c = website.charAt(i);
+            if (Character.isWhitespace(c) || Character.isISOControl(c)) {
+                throw new ValidationException("Website cannot contain spaces or control characters.");
+            }
+        }
         try {
             new URL("https://" + website);
         } catch (MalformedURLException e) {

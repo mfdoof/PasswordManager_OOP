@@ -129,9 +129,11 @@ Terminal UI built with Lanterna. Replaces Swing and the console harness. Keyboar
 | `?` | help overlay | anywhere |
 | `q` | quit (clears screen, wipes keys) | list, unlock |
 | `TAB` / `shift+TAB` | next / previous field | modals |
-| `g` | generate password | entry modal |
-| `v` | toggle password visibility | entry modal |
+| `g` / `ctrl+g` | generate password (`g` on the generator row, `ctrl+g` from any field) | entry modal |
+| `v` / `ctrl+v` | toggle password visibility (`v` on the generator row, `ctrl+v` from any field) | entry modal |
 | `ENTER` / `ESC` | confirm / cancel | modals |
+
+Note: inside text fields `g` and `v` are ordinary characters, so the entry modal only treats them as commands on the generator row (reached with TAB). `ctrl+v` works from any field in most terminals, but some (Windows Terminal, GNOME Terminal with its default bindings) take `ctrl+v` as paste and never send it to the app; `v` on the generator row is the reliable toggle.
 
 ## 5. Clipboard
 - `c` and `u` use the Java AWT clipboard when a desktop session exists. Password copies clear after 20s (only if the clipboard still holds our value).

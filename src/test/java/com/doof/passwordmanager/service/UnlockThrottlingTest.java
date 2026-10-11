@@ -140,6 +140,21 @@ class UnlockThrottlingTest {
     }
 
     @Test
+    void sessionRemainingFollowsActivityAndTheClock() {
+        vault.unlockVault(RIGHT.toCharArray());
+        assertEquals(VaultService.SESSION_TIMEOUT_MS, vault.sessionRemainingMs());
+        clock.advance(60_000);
+        assertEquals(VaultService.SESSION_TIMEOUT_MS - 60_000, vault.sessionRemainingMs());
+        vault.resetSessionTimer();
+        assertEquals(VaultService.SESSION_TIMEOUT_MS, vault.sessionRemainingMs());
+        clock.advance(VaultService.SESSION_TIMEOUT_MS + 5_000);
+        assertEquals(0, vault.sessionRemainingMs(), "never negative");
+        vault.lockVault();
+        vault.resetSessionTimer();  // no effect while locked
+        assertEquals(0, vault.sessionRemainingMs());
+    }
+
+    @Test
     void noFailuresMeansNoThrottling() {
         UnlockStatus status = vault.unlockStatus();
         assertEquals(0, status.getFailedAttempts());

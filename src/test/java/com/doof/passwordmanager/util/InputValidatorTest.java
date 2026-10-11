@@ -25,6 +25,18 @@ class InputValidatorTest {
     }
 
     @Test
+    void websitesAreCheckedForSpacesControlCharsAndLength() {
+        for (String ok : new String[]{"github.com", "gitea.doof.quest", "example.com/login", "localhost:8080", "192.168.1.10"}) {
+            assertDoesNotThrow(() -> InputValidator.validateWebsite(ok), ok);
+        }
+        String tooLong = "a".repeat(InputValidator.MAX_WEBSITE_LENGTH + 1);
+        for (String bad : new String[]{"", "   ", "a site", "tab\tsite", "new\nline", tooLong, "example.com:abc"}) {
+            assertThrows(ValidationException.class, () -> InputValidator.validateWebsite(bad), bad);
+        }
+        assertDoesNotThrow(() -> InputValidator.validateWebsite("  github.com  "), "surrounding spaces are trimmed");
+    }
+
+    @Test
     void emptyLongOrControlCharUsernamesAreRejected() {
         String tooLong = "x".repeat(InputValidator.MAX_USERNAME_LENGTH + 1);
         for (String bad : new String[]{null, "", "   ", tooLong, "user\nname", "tab\tbed"}) {

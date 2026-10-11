@@ -16,7 +16,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 /**
  * docs/TUI_DESIGN.md §3.3: entry list, live search, details pane, footer and status bar.
@@ -35,8 +34,8 @@ public final class VaultScreen implements TuiScreen {
     static final long REVEAL_MILLIS = 10_000;
     static final String EMPTY = "vault is empty - press [a] to add an entry";
 
-    /** Keys from §4 that later steps implement; pressing one says so instead of doing nothing. */
-    static final Map<Character, String> NOT_YET = Map.of('p', "change password");
+    static final String AUTO_LOCKED = "ok: auto-locked after 5 min idle";
+    static final long LOCKING_WARNING_MS = 30_000;
 
     static final Comparator<EntrySummary> ORDER = Comparator
             .comparing(EntrySummary::getSite, String.CASE_INSENSITIVE_ORDER)
@@ -145,9 +144,24 @@ public final class VaultScreen implements TuiScreen {
 
     private void lock(String notice) {
         hideSecrets();
-        ctx.clipboard.clearNow();
-        ctx.connector.lockVault();
-        ctx.show(new UnlockScreen(ctx, notice));
+        ctx.lockToUnlock(notice);
+    }
+
+    /** Header right side: lock state + idle countdown; [LOCKING] in the last 30s. */
+    static String sessionLabel(long remainingMs) {
+        long secs = (remainingMs + 999) / 1000;
+        String state = remainingMs <= LOCKING_WARNING_MS ? "[LOCKING]" : STATE;
+        return state + " | auto-lock " + (secs / 60) + ":" + String.format("%02d", secs % 60);
+    }
+
+    /** Changes once per displayed second; modals drawn over this screen redraw when it changes. */
+    long sessionSecond() {
+        return (ctx.connector.getSessionRemainingMs() + 999) / 1000;
+    }
+
+    /** Called by the change-password modal on success. */
+    void notice(String message) {
+        status.show(message, ctx.now());
     }
 
     /** Called by the entry form after a save: refresh, select the entry (clearing a filter that hides it). */
@@ -279,18 +293,14 @@ public final class VaultScreen implements TuiScreen {
             case 'u' -> copyUser();
             case '?' -> ctx.show(new HelpOverlay(ctx, this));
             case 'l' -> lock("ok: vault locked");
+            case 'p' -> ctx.show(new ChangePasswordModal(ctx, this));
             case 'q' -> {
                 hideSecrets();
                 ctx.clipboard.clearNow();
                 ctx.connector.lockVault();
                 return Action.QUIT;
             }
-            default -> {
-                String name = NOT_YET.get(c);
-                if (name != null) {
-                    status.show("err: [" + c + "] " + name + " is not available yet", ctx.now());
-                }
-            }
+            default -> { }
         }
         return Action.REDRAW;
     }
@@ -365,8 +375,8 @@ public final class VaultScreen implements TuiScreen {
 
     @Override
     public boolean tick(long now) {
-        if (!ctx.connector.isUnlocked()) {  // auto-lock fired in VaultService
-            lock("ok: vault auto-locked");
+        if (!ctx.connector.isUnlocked()) {  // idle timeout (TuiContext.tick) or the service's safety-net timer
+            lock(AUTO_LOCKED);
             return true;
         }
         boolean changed = status.tick(now);
@@ -383,7 +393,7 @@ public final class VaultScreen implements TuiScreen {
             status.show("ok: clipboard cleared", now);
             changed = true;
         }
-        long key = (shownPassword != null ? Draw.secondsLeft(passwordUntil - now) : 0) * 1_000_000
+        long key = sessionSecond() * 1_000_000_000L + (shownPassword != null ? Draw.secondsLeft(passwordUntil - now) : 0) * 1_000_000
                 + (notesShown ? Draw.secondsLeft(notesUntil - now) : 0) * 1_000
                 + (copyActive ? ctx.clipboard.secondsUntilClear(now) : 0);
         if (key != countdownKey) {
@@ -417,8 +427,10 @@ public final class VaultScreen implements TuiScreen {
         // Header.
         g.setForegroundColor(t.primary);
         g.putString(2, 0, " " + TITLE + " ");
-        g.setForegroundColor(t.success);
-        g.putString(w - STATE.length() - 3, 0, STATE);
+        long remaining = ctx.connector.getSessionRemainingMs();
+        String session = sessionLabel(remaining);
+        g.setForegroundColor(remaining <= LOCKING_WARNING_MS ? t.error : t.success);
+        g.putString(w - session.length() - 3, 0, session);
 
         drawSearchRow(g, t, w);
         drawList(g, t, w, listTop);
