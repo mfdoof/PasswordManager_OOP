@@ -104,7 +104,7 @@ public class EntryService {
      * Decrypts the password of entry {@code id}, passes it to {@code use}, and wipes it as
      * soon as {@code use} returns. {@code use} must not keep the array.
      */
-    public <T> T withPassword(long id, Function<char[], T> use) {
+    public synchronized <T> T withPassword(long id, Function<char[], T> use) {
         Objects.requireNonNull(use);
         char[] password = decrypt(require(id), EntryCodec::decodePassword);
         try {
@@ -115,7 +115,7 @@ public class EntryService {
     }
 
     /** Decrypts the notes of entry {@code id} on demand; null if none. */
-    public String revealNotes(long id) {
+    public synchronized String revealNotes(long id) {
         return decrypt(require(id), EntryCodec::decodeNotes);
     }
 
@@ -196,6 +196,14 @@ public class EntryService {
         checkUnlocked();
         entryDao.delete(id);
         if (index != null) index.remove(id);
+    }
+
+    /**
+     * Runs {@code op} while no other entry operation can run, e.g. master password rotation,
+     * which re-encrypts every entry and swaps the key. The index stays valid (contents unchanged).
+     */
+    synchronized <T> T exclusively(java.util.function.Supplier<T> op) {
+        return op.get();
     }
 
     private synchronized void clearIndex() {

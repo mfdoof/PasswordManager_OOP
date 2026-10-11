@@ -2,6 +2,7 @@ package com.doof.passwordmanager.service;
 
 import com.doof.passwordmanager.dao.EntryDao;
 import com.doof.passwordmanager.dao.VaultMetadataDao;
+import com.doof.passwordmanager.dao.VaultRotationDao;
 import com.doof.passwordmanager.service.EntryService.EntrySummary;
 
 import java.util.List;
@@ -13,10 +14,11 @@ public class ApplicationConnector {
     private final VaultService vaultService;
     private final EntryService entryService;
 
-    public ApplicationConnector(VaultMetadataDao vaultMetadataDao, EntryDao entryDao) {
+    public ApplicationConnector(VaultMetadataDao vaultMetadataDao, VaultRotationDao rotationDao, EntryDao entryDao) {
         Objects.requireNonNull(vaultMetadataDao);
+        Objects.requireNonNull(rotationDao);
         Objects.requireNonNull(entryDao);
-        this.vaultService = new VaultService(vaultMetadataDao);
+        this.vaultService = new VaultService(vaultMetadataDao, rotationDao);
         this.entryService = new EntryService(entryDao, vaultService);
     }
 
@@ -37,6 +39,18 @@ public class ApplicationConnector {
     /** Failed-attempt count and remaining wait before the next unlock is allowed. */
     public UnlockStatus getUnlockStatus() {
         return vaultService.unlockStatus();
+    }
+
+    /**
+     * Changes the master password: re-encrypts all entries in one transaction, all-or-nothing.
+     * Wipes both arrays. Throws {@link InvalidPasswordException} / {@link UnlockThrottledException}
+     * like unlock. The session stays unlocked with the new key.
+     */
+    public void changeMasterPassword(char[] oldPassword, char[] newPassword) {
+        entryService.exclusively(() -> {
+            vaultService.rotateVault(oldPassword, newPassword);
+            return null;
+        });
     }
 
     public void lockVault() {

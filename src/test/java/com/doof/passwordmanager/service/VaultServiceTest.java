@@ -2,6 +2,7 @@ package com.doof.passwordmanager.service;
 
 import com.doof.passwordmanager.crypto.KdfParams;
 import com.doof.passwordmanager.dao.JdbcVaultMetadataDao;
+import com.doof.passwordmanager.dao.JdbcVaultRotationDao;
 import com.doof.passwordmanager.db.ConnectionManager;
 import com.doof.passwordmanager.model.VaultMetadata;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.time.Clock;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -21,12 +23,15 @@ class VaultServiceTest {
     Path tmp;
 
     private JdbcVaultMetadataDao dao;
+    private JdbcVaultRotationDao rotationDao;
     private VaultService vault;
 
     @BeforeEach
     void setUp() {
-        dao = new JdbcVaultMetadataDao(ConnectionManager.open(tmp.resolve("vault.db"), w -> {}));
-        vault = new VaultService(dao, FAST);
+        ConnectionManager cm = ConnectionManager.open(tmp.resolve("vault.db"), w -> {});
+        dao = new JdbcVaultMetadataDao(cm);
+        rotationDao = new JdbcVaultRotationDao(cm);
+        vault = new VaultService(dao, rotationDao, FAST, Clock.systemUTC());
     }
 
     @Test
@@ -74,7 +79,7 @@ class VaultServiceTest {
         vault.lockVault();
 
         // A build with different defaults must still unlock an existing vault.
-        VaultService otherDefaults = new VaultService(dao, new KdfParams(2048, 2, 1));
+        VaultService otherDefaults = new VaultService(dao, rotationDao, new KdfParams(2048, 2, 1), Clock.systemUTC());
         otherDefaults.unlockVault("MasterPass1".toCharArray());
         assertTrue(otherDefaults.isUnlocked());
         assertEquals(FAST, KdfParams.fromJson(dao.find().getKdfParams()));

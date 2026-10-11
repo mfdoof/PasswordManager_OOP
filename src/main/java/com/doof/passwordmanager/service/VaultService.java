@@ -1,14 +1,19 @@
 package com.doof.passwordmanager.service;
 
+import com.doof.passwordmanager.crypto.AesGcm;
 import com.doof.passwordmanager.crypto.Kdf;
 import com.doof.passwordmanager.crypto.KdfParams;
 import com.doof.passwordmanager.crypto.KeyHierarchy;
 import com.doof.passwordmanager.crypto.SecureWipe;
 import com.doof.passwordmanager.dao.VaultMetadataDao;
+import com.doof.passwordmanager.dao.VaultRotationDao;
+import com.doof.passwordmanager.model.Entry;
 import com.doof.passwordmanager.model.VaultMetadata;
+import com.doof.passwordmanager.util.InputValidator;
 
 import java.security.MessageDigest;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
@@ -34,6 +39,7 @@ class VaultService {
     static final long MAX_DELAY_MS = 30_000;
 
     private final VaultMetadataDao metadataDao;
+    private final VaultRotationDao rotationDao;
     private final KdfParams newVaultParams;
     private final Clock clock;
     private final Object unlockLock = new Object();
@@ -49,17 +55,17 @@ class VaultService {
     private ScheduledFuture<?> autoLockTask;
     private final List<Runnable> lockListeners = new CopyOnWriteArrayList<>();
 
-    VaultService(VaultMetadataDao metadataDao) {
-        this(metadataDao, KdfParams.DEFAULT);
+    VaultService(VaultMetadataDao metadataDao, VaultRotationDao rotationDao) {
+        this(metadataDao, rotationDao, KdfParams.DEFAULT, Clock.systemUTC());
     }
 
-    /** {@code newVaultParams} is used only when creating a vault; unlock reads params from kdf_params. */
-    VaultService(VaultMetadataDao metadataDao, KdfParams newVaultParams) {
-        this(metadataDao, newVaultParams, Clock.systemUTC());
-    }
-
-    VaultService(VaultMetadataDao metadataDao, KdfParams newVaultParams, Clock clock) {
+    /**
+     * {@code newVaultParams} is used when creating a vault and when rotating (so rotation upgrades
+     * old params); unlock always reads params from kdf_params.
+     */
+    VaultService(VaultMetadataDao metadataDao, VaultRotationDao rotationDao, KdfParams newVaultParams, Clock clock) {
         this.metadataDao = metadataDao;
+        this.rotationDao = rotationDao;
         this.newVaultParams = newVaultParams;
         this.clock = clock;
     }
@@ -138,34 +144,10 @@ class VaultService {
 
     private void unlockSerialized(char[] masterPassword) {
         byte[] masterKey = null;
-        byte[] authKey = null;
         byte[] newEncKey = null;
         try {
-            VaultMetadata meta = metadataDao.find();
-            if (meta == null) {
-                throw new RuntimeException("Vault is not initialized");
-            }
-            UnlockStatus status = statusOf(meta, clock.millis());
-            if (status.isThrottled()) {
-                throw new UnlockThrottledException(status);
-            }
-            if (meta.getEncVersion() != ENC_VERSION) {
-                throw new RuntimeException("Unsupported vault encryption version " + meta.getEncVersion());
-            }
-            KdfParams params = KdfParams.fromJson(meta.getKdfParams());
-
-            masterKey = Kdf.deriveMasterKey(masterPassword, meta.getKdfSalt(), params);
-            authKey = KeyHierarchy.authKey(masterKey);
-            if (!MessageDigest.isEqual(authKey, meta.getAuthHash())) {  // constant-time
-                // Persist before reporting, so killing the app after a guess can't skip the count.
-                int failed = metadataDao.recordFailedUnlock(clock.millis());
-                throw new InvalidPasswordException(new UnlockStatus(failed, delayAfter(failed)));
-            }
-            if (meta.getFailedAttempts() > 0) {
-                metadataDao.resetFailedUnlocks();
-                meta.setFailedAttempts(0);
-                meta.setLastFailedAt(null);
-            }
+            VaultMetadata meta = requireMetadata();
+            masterKey = verifyMasterPassword(meta, masterPassword);
             newEncKey = KeyHierarchy.encKey(masterKey);
 
             setUnlocked(newEncKey, meta);
@@ -173,9 +155,112 @@ class VaultService {
         } finally {
             SecureWipe.wipe(masterPassword);
             SecureWipe.wipe(masterKey);
-            SecureWipe.wipe(authKey);
             SecureWipe.wipe(newEncKey);
         }
+    }
+
+    /**
+     * Changes the master password (ARCHITECTURE §8). Verifies {@code oldPassword} with the same
+     * throttling as unlock, then in ONE transaction re-encrypts every entry (same ids, so same AAD)
+     * under keys from {@code newPassword} with a new salt and the current default KDF params, and
+     * replaces the metadata. Any failure rolls back, so the vault still opens with the old password.
+     * On success the session is unlocked with the new key. Wipes both password arrays.
+     *
+     * @throws UnlockThrottledException if still inside the delay after a failed attempt
+     * @throws InvalidPasswordException if {@code oldPassword} is wrong (the failure is recorded first)
+     */
+    void rotateVault(char[] oldPassword, char[] newPassword) {
+        synchronized (unlockLock) {
+            byte[] oldMaster = null;
+            byte[] oldEncKey = null;
+            byte[] newMaster = null;
+            byte[] newEncKey = null;
+            try {
+                InputValidator.validatePassword(newPassword);
+                VaultMetadata meta = requireMetadata();
+                oldMaster = verifyMasterPassword(meta, oldPassword);
+                oldEncKey = KeyHierarchy.encKey(oldMaster);
+
+                byte[] newSalt = Kdf.newSalt();
+                newMaster = Kdf.deriveMasterKey(newPassword, newSalt, newVaultParams);
+                newEncKey = KeyHierarchy.encKey(newMaster);
+                VaultMetadata newMeta = new VaultMetadata(
+                        newSalt, newVaultParams.toJson(), KeyHierarchy.authKey(newMaster), ENC_VERSION);
+
+                byte[] fromKey = oldEncKey, toKey = newEncKey;
+                rotationDao.rotate(entries -> new VaultRotationDao.Rotation(newMeta, reencryptAll(entries, fromKey, toKey)));
+
+                setUnlocked(newEncKey, newMeta);
+                newEncKey = null;
+            } finally {
+                SecureWipe.wipe(oldPassword);
+                SecureWipe.wipe(newPassword);
+                SecureWipe.wipe(oldMaster);
+                SecureWipe.wipe(oldEncKey);
+                SecureWipe.wipe(newMaster);
+                SecureWipe.wipe(newEncKey);
+            }
+        }
+    }
+
+    /** Decrypts each blob with {@code fromKey} and re-encrypts it with {@code toKey}, keeping id and AAD. */
+    private static List<Entry> reencryptAll(List<Entry> entries, byte[] fromKey, byte[] toKey) {
+        List<Entry> out = new ArrayList<>(entries.size());
+        for (Entry e : entries) {
+            byte[] aad = EntryService.aad(e.getId());
+            byte[] plaintext = AesGcm.decrypt(fromKey, e.getIv(), e.getDataEnc(), aad);
+            try {
+                AesGcm.Sealed sealed = AesGcm.encrypt(toKey, plaintext, aad);
+                Entry r = new Entry(sealed.ciphertext, sealed.iv, ENC_VERSION);
+                r.setId(e.getId());
+                out.add(r);
+            } finally {
+                SecureWipe.wipe(plaintext);
+            }
+        }
+        return out;
+    }
+
+    private VaultMetadata requireMetadata() {
+        VaultMetadata meta = metadataDao.find();
+        if (meta == null) {
+            throw new RuntimeException("Vault is not initialized");
+        }
+        if (meta.getEncVersion() != ENC_VERSION) {
+            throw new RuntimeException("Unsupported vault encryption version " + meta.getEncVersion());
+        }
+        return meta;
+    }
+
+    /**
+     * Throttle check, then Argon2id + constant-time auth key compare. A mismatch is recorded
+     * before throwing; a match resets the failure counter. Returns the master key (caller wipes).
+     */
+    private byte[] verifyMasterPassword(VaultMetadata meta, char[] password) {
+        UnlockStatus status = statusOf(meta, clock.millis());
+        if (status.isThrottled()) {
+            throw new UnlockThrottledException(status);
+        }
+        KdfParams params = KdfParams.fromJson(meta.getKdfParams());
+
+        byte[] masterKey = Kdf.deriveMasterKey(password, meta.getKdfSalt(), params);
+        byte[] authKey = KeyHierarchy.authKey(masterKey);
+        try {
+            if (!MessageDigest.isEqual(authKey, meta.getAuthHash())) {  // constant-time
+                SecureWipe.wipe(masterKey);
+                // Persist before reporting, so killing the app after a guess can't skip the count.
+                int failed = metadataDao.recordFailedUnlock(clock.millis());
+                throw new InvalidPasswordException(new UnlockStatus(failed, delayAfter(failed)));
+            }
+        } finally {
+            SecureWipe.wipe(authKey);
+        }
+        if (meta.getFailedAttempts() > 0) {
+            metadataDao.resetFailedUnlocks();
+            meta.setFailedAttempts(0);
+            meta.setLastFailedAt(null);
+        }
+        return masterKey;
     }
 
     void lockVault() {
@@ -219,10 +304,6 @@ class VaultService {
             }
             return op.apply(encKey);
         }
-    }
-
-    void rotateVault(char[] oldMasterPassword, char[] newMasterPassword, String newKdfParamsJson) {
-        throw new UnsupportedOperationException("Not implemented yet");
     }
 
     private void setUnlocked(byte[] key, VaultMetadata metadata) {

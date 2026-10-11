@@ -4,6 +4,7 @@ import com.doof.passwordmanager.crypto.CryptoException;
 import com.doof.passwordmanager.dao.EntryDao;
 import com.doof.passwordmanager.dao.JdbcEntryDao;
 import com.doof.passwordmanager.dao.JdbcVaultMetadataDao;
+import com.doof.passwordmanager.dao.JdbcVaultRotationDao;
 import com.doof.passwordmanager.db.ConnectionManager;
 import com.doof.passwordmanager.model.Entry;
 import com.doof.passwordmanager.service.EntryService.EntrySummary;
@@ -44,7 +45,7 @@ class EntryServiceTest {
         ConnectionManager cm = ConnectionManager.open(vaultFile, w -> {});
         entryDao = new JdbcEntryDao(cm);
         countingDao = new CountingEntryDao(entryDao);
-        vault = new VaultService(new JdbcVaultMetadataDao(cm), VaultServiceTest.FAST);
+        vault = new VaultService(new JdbcVaultMetadataDao(cm), new JdbcVaultRotationDao(cm), VaultServiceTest.FAST, java.time.Clock.systemUTC());
         entries = new EntryService(countingDao, vault);
         vault.createVault("MasterPass1".toCharArray());
     }

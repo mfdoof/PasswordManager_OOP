@@ -1,6 +1,7 @@
 package com.doof.passwordmanager.service;
 
 import com.doof.passwordmanager.dao.JdbcVaultMetadataDao;
+import com.doof.passwordmanager.dao.JdbcVaultRotationDao;
 import com.doof.passwordmanager.db.ConnectionManager;
 import com.doof.passwordmanager.testutil.MutableClock;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,7 +34,7 @@ class UnlockThrottlingTest {
     /** A fresh service over the same file, like restarting the app. */
     private VaultService newVaultService() {
         ConnectionManager cm = ConnectionManager.open(tmp.resolve("vault.db"), w -> {});
-        return new VaultService(new JdbcVaultMetadataDao(cm), VaultServiceTest.FAST, clock);
+        return new VaultService(new JdbcVaultMetadataDao(cm), new JdbcVaultRotationDao(cm, clock), VaultServiceTest.FAST, clock);
     }
 
     @Test

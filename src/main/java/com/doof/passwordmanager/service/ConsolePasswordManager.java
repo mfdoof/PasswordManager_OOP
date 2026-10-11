@@ -2,6 +2,7 @@ package com.doof.passwordmanager.service;
 
 import com.doof.passwordmanager.dao.JdbcEntryDao;
 import com.doof.passwordmanager.dao.JdbcVaultMetadataDao;
+import com.doof.passwordmanager.dao.JdbcVaultRotationDao;
 import com.doof.passwordmanager.dao.EntryDao;
 import com.doof.passwordmanager.dao.VaultMetadataDao;
 import com.doof.passwordmanager.db.ConnectionManager;
@@ -17,7 +18,7 @@ public class ConsolePasswordManager {
     public static void main(String[] args) {
         ConnectionManager cm = ConnectionManager.open(ConnectionManager.resolveVaultPath(args));
         VaultMetadataDao vaultDao = new JdbcVaultMetadataDao(cm);
-        VaultService vaultService = new VaultService(vaultDao);
+        VaultService vaultService = new VaultService(vaultDao, new JdbcVaultRotationDao(cm));
         EntryDao entryDao = new JdbcEntryDao(cm);
         EntryService entryService = new EntryService(entryDao, vaultService);
 
@@ -38,6 +39,7 @@ public class ConsolePasswordManager {
                         return;
                     }
                     case "7" -> revealPassword(entryService);
+                    case "8" -> changeMasterPassword(vaultService, entryService);
                     default -> System.out.println("Invalid option. Try again.");
                 }
             } catch (Exception e) {
@@ -56,6 +58,7 @@ public class ConsolePasswordManager {
         System.out.println("5) Lock vault");
         System.out.println("6) Exit");
         System.out.println("7) Reveal password");
+        System.out.println("8) Change master password");
         System.out.print("> ");
     }
 
@@ -118,6 +121,18 @@ public class ConsolePasswordManager {
             System.out.println(pw);
             return null;
         });
+    }
+
+    private static void changeMasterPassword(VaultService vaultService, EntryService entryService) {
+        System.out.print("Current master password: ");
+        char[] oldPw = scanner.nextLine().toCharArray();
+        System.out.print("New master password: ");
+        char[] newPw = scanner.nextLine().toCharArray();
+        entryService.exclusively(() -> {
+            vaultService.rotateVault(oldPw, newPw);
+            return null;
+        });
+        System.out.println("Master password changed.");
     }
 
     private static void lockVault(VaultService vaultService) {

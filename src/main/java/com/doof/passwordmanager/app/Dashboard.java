@@ -2,6 +2,9 @@ package com.doof.passwordmanager.app;
 
 import com.doof.passwordmanager.service.EntryService.EntrySummary;
 import com.doof.passwordmanager.service.ApplicationConnector;
+import com.doof.passwordmanager.service.InvalidPasswordException;
+import com.doof.passwordmanager.service.UnlockThrottledException;
+import com.doof.passwordmanager.util.InputValidator;
 
 import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
@@ -29,6 +32,7 @@ public class Dashboard {
     private JButton editButton;
     private JButton deleteButton;
     private JButton lockButton;
+    private JButton changePasswordButton;
     private JTextField searchField;
 
     private static final int REVEAL_MS = 10_000;
@@ -60,6 +64,7 @@ public class Dashboard {
             editButton = new JButton("Edit");
             deleteButton = new JButton("Delete");
             lockButton = new JButton("Lock");
+            changePasswordButton = new JButton("Change password");
 
             top.add(new JLabel("Search:"));
             top.add(searchField);
@@ -68,6 +73,7 @@ public class Dashboard {
             top.add(editButton);
             top.add(deleteButton);
             top.add(lockButton);
+            top.add(changePasswordButton);
             root.add(top, BorderLayout.NORTH);
 
             tableModel = new EntryTableModel();
@@ -91,6 +97,7 @@ public class Dashboard {
                 close();
             });
 
+            changePasswordButton.addActionListener(e -> showChangePasswordDialog());
             searchField.addActionListener(e -> searchAndRefresh());
 
             refresh();
@@ -160,9 +167,9 @@ public class Dashboard {
             String email = emailField.getText().trim();
             String website = websiteField.getText().trim();
             try {
-                com.doof.passwordmanager.util.InputValidator.validateUsername(email);
-                com.doof.passwordmanager.util.InputValidator.validateWebsite(website);
-                com.doof.passwordmanager.util.InputValidator.validatePassword(pwd);
+                InputValidator.validateUsername(email);
+                InputValidator.validateWebsite(website);
+                InputValidator.validatePassword(pwd);
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(frame, ex.getMessage(), "Validation", JOptionPane.WARNING_MESSAGE);
                 Arrays.fill(pwd, '\0');
@@ -220,9 +227,9 @@ public class Dashboard {
             String email = emailField.getText().trim();
             String website = websiteField.getText().trim();
             try {
-                com.doof.passwordmanager.util.InputValidator.validateUsername(email);
-                com.doof.passwordmanager.util.InputValidator.validateWebsite(website);
-                if (pwd != null && pwd.length > 0) com.doof.passwordmanager.util.InputValidator.validatePassword(pwd);
+                InputValidator.validateUsername(email);
+                InputValidator.validateWebsite(website);
+                if (pwd != null && pwd.length > 0) InputValidator.validatePassword(pwd);
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(frame, ex.getMessage(), "Validation", JOptionPane.WARNING_MESSAGE);
                 Arrays.fill(pwd, '\0');
@@ -285,6 +292,77 @@ public class Dashboard {
                     else JOptionPane.showMessageDialog(frame, "Failed to delete entry.", "Error", JOptionPane.ERROR_MESSAGE);
                 } catch (Exception e) {
                     JOptionPane.showMessageDialog(frame, "Failed to delete entry: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }.execute();
+    }
+
+    private void showChangePasswordDialog() {
+        JPanel p = new JPanel(new GridLayout(0, 1, 4, 4));
+        JPasswordField currentField = new JPasswordField();
+        JPasswordField newField = new JPasswordField();
+        JPasswordField confirmField = new JPasswordField();
+        p.add(new JLabel("Current master password")); p.add(currentField);
+        p.add(new JLabel("New master password")); p.add(newField);
+        p.add(new JLabel("Confirm new password")); p.add(confirmField);
+
+        int option = JOptionPane.showConfirmDialog(frame, p, "Change master password", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        char[] current = currentField.getPassword();
+        char[] next = newField.getPassword();
+        char[] confirm = confirmField.getPassword();
+        if (option != JOptionPane.OK_OPTION) {
+            Arrays.fill(current, '\0');
+            Arrays.fill(next, '\0');
+            Arrays.fill(confirm, '\0');
+            return;
+        }
+        try {
+            if (!Arrays.equals(next, confirm)) {
+                throw new IllegalArgumentException("New passwords do not match.");
+            }
+            InputValidator.validatePassword(next);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(frame, ex.getMessage(), "Validation", JOptionPane.WARNING_MESSAGE);
+            Arrays.fill(current, '\0');
+            Arrays.fill(next, '\0');
+            return;
+        } finally {
+            Arrays.fill(confirm, '\0');
+        }
+
+        changePasswordButton.setEnabled(false);
+        new SwingWorker<String, Void>() {
+            @Override
+            protected String doInBackground() {
+                if (connector == null) return "Application not initialized.";
+                try {
+                    connector.changeMasterPassword(current, next);  // wipes both arrays
+                    return null;
+                } catch (InvalidPasswordException e) {
+                    return "Current password is incorrect (" + e.getFailedAttempts() + " failed attempts). "
+                            + "Try again in " + (e.getRetryAfterMs() + 999) / 1000 + "s.";
+                } catch (UnlockThrottledException e) {
+                    return e.getMessage();
+                } catch (Exception e) {
+                    return "Failed to change master password; the old password still works.";
+                } finally {
+                    Arrays.fill(current, '\0');
+                    Arrays.fill(next, '\0');
+                }
+            }
+
+            @Override
+            protected void done() {
+                changePasswordButton.setEnabled(true);
+                try {
+                    String error = get();
+                    if (error == null) {
+                        JOptionPane.showMessageDialog(frame, "Master password changed.", "Done", JOptionPane.INFORMATION_MESSAGE);
+                    } else {
+                        JOptionPane.showMessageDialog(frame, error, "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                } catch (Exception e) {
+                    JOptionPane.showMessageDialog(frame, "Failed to change master password.", "Error", JOptionPane.ERROR_MESSAGE);
                 }
             }
         }.execute();
