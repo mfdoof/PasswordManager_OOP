@@ -86,7 +86,7 @@ public class ConsolePasswordManager {
     }
 
     private static void addEntry(EntryService entryService) {
-        System.out.print("Enter email: ");
+        System.out.print("Enter username: ");
         String user = scanner.nextLine();
         System.out.print("Enter website: ");
         String site = scanner.nextLine();
@@ -105,7 +105,7 @@ public class ConsolePasswordManager {
         }
         System.out.println("\nStored entries:");
         for (EntryService.EntrySummary e : list) {
-            System.out.printf("ID: %d | Email: %s | Website: %s | Password: ********%n",
+            System.out.printf("ID: %d | Username: %s | Website: %s | Password: ********%n",
                     e.getId(), e.getUser(), e.getSite());
         }
     }

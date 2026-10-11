@@ -151,7 +151,7 @@ public class Dashboard {
         JTextField emailField = new JTextField();
         JPasswordField passwordField = new JPasswordField();
         p.add(new JLabel("Website")); p.add(websiteField);
-        p.add(new JLabel("Email")); p.add(emailField);
+        p.add(new JLabel("Username")); p.add(emailField);
         p.add(new JLabel("Password")); p.add(passwordField);
 
         int option = JOptionPane.showConfirmDialog(frame, p, "Add entry", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
@@ -160,7 +160,7 @@ public class Dashboard {
             String email = emailField.getText().trim();
             String website = websiteField.getText().trim();
             try {
-                com.doof.passwordmanager.util.InputValidator.validateEmail(email);
+                com.doof.passwordmanager.util.InputValidator.validateUsername(email);
                 com.doof.passwordmanager.util.InputValidator.validateWebsite(website);
                 com.doof.passwordmanager.util.InputValidator.validatePassword(pwd);
             } catch (Exception ex) {
@@ -211,7 +211,7 @@ public class Dashboard {
         JTextField emailField = new JTextField(er.email);
         JPasswordField passwordField = new JPasswordField();
         p.add(new JLabel("Website")); p.add(websiteField);
-        p.add(new JLabel("Email")); p.add(emailField);
+        p.add(new JLabel("Username")); p.add(emailField);
         p.add(new JLabel("New Password (leave blank to keep)")); p.add(passwordField);
 
         int option = JOptionPane.showConfirmDialog(frame, p, "Edit entry", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
@@ -220,7 +220,7 @@ public class Dashboard {
             String email = emailField.getText().trim();
             String website = websiteField.getText().trim();
             try {
-                com.doof.passwordmanager.util.InputValidator.validateEmail(email);
+                com.doof.passwordmanager.util.InputValidator.validateUsername(email);
                 com.doof.passwordmanager.util.InputValidator.validateWebsite(website);
                 if (pwd != null && pwd.length > 0) com.doof.passwordmanager.util.InputValidator.validatePassword(pwd);
             } catch (Exception ex) {
@@ -303,7 +303,7 @@ public class Dashboard {
     }
 
     private class EntryTableModel extends AbstractTableModel {
-        private final String[] cols = {"Website", "Email", "Password"};
+        private final String[] cols = {"Website", "Username", "Password"};
         private final List<EntryRow> rows = new ArrayList<>();
 
         void setFromSummaries(List<EntrySummary> summaries) {

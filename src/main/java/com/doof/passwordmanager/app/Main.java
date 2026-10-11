@@ -1,6 +1,9 @@
 package com.doof.passwordmanager.app;
 
 import com.doof.passwordmanager.service.ApplicationConnector;
+import com.doof.passwordmanager.service.InvalidPasswordException;
+import com.doof.passwordmanager.service.UnlockStatus;
+import com.doof.passwordmanager.service.UnlockThrottledException;
 import com.doof.passwordmanager.util.InputValidator;
 
 import javax.swing.*;
@@ -31,11 +34,7 @@ public class Main {
     private JButton cancelButton;
     private JLabel setupErrorLabel;
 
-    private int failureCount = 0;
     private boolean isProcessing = false;
-
-    private static final int FAILURE_THRESHOLD = 5;
-    private static final int INITIAL_LOCKOUT_SECONDS = 30;
 
     public Main(ApplicationConnector appConnector, Runnable onUnlockSuccess) {
         this.appConnector = appConnector;
@@ -56,6 +55,15 @@ public class Main {
                 initialized = false;
             }
             cardLayout.show(rootPanel, initialized ? CARD_UNLOCK : CARD_SETUP);
+            if (initialized) {
+                // Throttling is persisted, so a restart may land in the middle of a wait.
+                try {
+                    UnlockStatus status = appConnector.getUnlockStatus();
+                    if (status.isThrottled()) {
+                        startLockout(status.getRetryAfterMs(), failedAttemptsText(status.getFailedAttempts()));
+                    }
+                } catch (Exception ignored) {}
+            }
         });
     }
 
@@ -228,6 +236,7 @@ public class Main {
 
         new SwingWorker<Boolean, Void>() {
             private String error;
+            private long retryAfterMs;
             @Override protected Boolean doInBackground() {
                 try {
                     if (appConnector == null) {
@@ -236,10 +245,16 @@ public class Main {
                     }
                     appConnector.unlockVault(password);
                     return true;
+                } catch (InvalidPasswordException e) {
+                    error = "Incorrect master password. " + failedAttemptsText(e.getFailedAttempts());
+                    retryAfterMs = e.getRetryAfterMs();
+                    return false;
+                } catch (UnlockThrottledException e) {
+                    error = failedAttemptsText(e.getFailedAttempts());
+                    retryAfterMs = e.getRetryAfterMs();
+                    return false;
                 } catch (RuntimeException e) {
-                    error = e.getMessage() != null && e.getMessage().contains("Invalid")
-                            ? "Incorrect master password."
-                            : "Unable to unlock vault.";
+                    error = "Unable to unlock vault.";
                     return false;
                 } finally {
                     if (password != null) Arrays.fill(password, '\0');
@@ -249,7 +264,6 @@ public class Main {
             @Override protected void done() {
                 try {
                     if (get()) {
-                        failureCount = 0;
                         SwingUtilities.invokeLater(() -> {
                             frame.setVisible(false);
                             Dashboard d = new Dashboard(appConnector);
@@ -262,9 +276,11 @@ public class Main {
                             d.show();
                         });
                     } else {
-                        failureCount++;
                         unlockErrorLabel.setText(error);
-                        if (failureCount >= FAILURE_THRESHOLD) startLockout(INITIAL_LOCKOUT_SECONDS);
+                        if (retryAfterMs > 0) {
+                            startLockout(retryAfterMs, error);
+                            return;  // startLockout re-enables input when the wait is over
+                        }
                     }
                 } catch (Exception ignored) {}
                 setProcessing(false);
@@ -329,19 +345,24 @@ public class Main {
         }.execute();
     }
 
-    private void startLockout(int seconds) {
+    private static String failedAttemptsText(int failedAttempts) {
+        return failedAttempts == 1 ? "1 failed attempt." : failedAttempts + " failed attempts.";
+    }
+
+    /** Disables unlock and counts down; VaultService enforces the delay, this only displays it. */
+    private void startLockout(long waitMs, String message) {
         setProcessing(true);
-        unlockErrorLabel.setText("Too many attempts. Try again in " + seconds + "s");
+        final int[] remaining = {(int) Math.max(1, (waitMs + 999) / 1000)};
+        unlockErrorLabel.setText(message + " Try again in " + remaining[0] + "s");
         Timer timer = new Timer(1000, null);
-        final int[] remaining = {seconds};
         timer.addActionListener(e -> {
             remaining[0]--;
-            unlockErrorLabel.setText("Too many attempts. Try again in " + remaining[0] + "s");
             if (remaining[0] <= 0) {
                 timer.stop();
-                failureCount = 0;
                 setProcessing(false);
-                unlockErrorLabel.setText("");
+                unlockErrorLabel.setText(message);
+            } else {
+                unlockErrorLabel.setText(message + " Try again in " + remaining[0] + "s");
             }
         });
         timer.start();

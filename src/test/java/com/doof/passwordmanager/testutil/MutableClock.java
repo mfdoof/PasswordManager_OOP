@@ -1,4 +1,4 @@
-package com.doof.passwordmanager.dao;
+package com.doof.passwordmanager.testutil;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -6,14 +6,14 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 
 /** Test clock whose time can be advanced manually. */
-final class MutableClock extends Clock {
+public final class MutableClock extends Clock {
     private long millis;
 
-    MutableClock(long startMillis) {
+    public MutableClock(long startMillis) {
         this.millis = startMillis;
     }
 
-    void advance(long deltaMillis) {
+    public void advance(long deltaMillis) {
         millis += deltaMillis;
     }
 

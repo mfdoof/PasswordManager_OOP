@@ -1,6 +1,7 @@
 package com.doof.passwordmanager.dao;
 
 import com.doof.passwordmanager.db.ConnectionManager;
+import com.doof.passwordmanager.testutil.MutableClock;
 import com.doof.passwordmanager.model.VaultMetadata;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -109,6 +110,36 @@ class JdbcVaultMetadataDaoTest {
         dao.insert(sample());
         ConnectionManager reopened = ConnectionManager.open(tmp.resolve("vault.db"), w -> {});
         assertNotNull(new JdbcVaultMetadataDao(reopened).find());
+    }
+
+    @Test
+    void recordFailedUnlockIncrementsAndPersists() {
+        dao.insert(sample());
+
+        assertEquals(1, dao.recordFailedUnlock(T0 + 10));
+        assertEquals(2, dao.recordFailedUnlock(T0 + 20));
+
+        VaultMetadata found = dao.find();
+        assertEquals(2, found.getFailedAttempts());
+        assertEquals(T0 + 20, found.getLastFailedAt());
+        assertEquals(T0, found.getUpdatedAt(), "throttle bookkeeping must not touch updated_at");
+    }
+
+    @Test
+    void resetFailedUnlocksClearsCountAndTimestamp() {
+        dao.insert(sample());
+        dao.recordFailedUnlock(T0 + 10);
+
+        dao.resetFailedUnlocks();
+
+        VaultMetadata found = dao.find();
+        assertEquals(0, found.getFailedAttempts());
+        assertNull(found.getLastFailedAt());
+    }
+
+    @Test
+    void recordFailedUnlockWithoutVaultFails() {
+        assertThrows(RuntimeException.class, () -> dao.recordFailedUnlock(T0));
     }
 
     private static VaultMetadata sample() {

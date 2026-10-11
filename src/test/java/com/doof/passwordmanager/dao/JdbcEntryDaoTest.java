@@ -1,6 +1,7 @@
 package com.doof.passwordmanager.dao;
 
 import com.doof.passwordmanager.db.ConnectionManager;
+import com.doof.passwordmanager.testutil.MutableClock;
 import com.doof.passwordmanager.model.Entry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -131,7 +131,7 @@ public class EntryService {
             site = InputValidator.sanitize(site);
             user = InputValidator.sanitize(user);
 
-            InputValidator.validateEmail(user);
+            InputValidator.validateUsername(user);
             InputValidator.validateWebsite(site);
             InputValidator.validatePassword(password);
 
@@ -159,7 +159,7 @@ public class EntryService {
 
             site = InputValidator.sanitize(site);
             user = InputValidator.sanitize(user);
-            InputValidator.validateEmail(user);
+            InputValidator.validateUsername(user);
             InputValidator.validateWebsite(site);
 
             EntrySummary current = index().get(id);

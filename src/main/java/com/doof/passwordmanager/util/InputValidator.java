@@ -6,21 +6,23 @@ import java.util.regex.Pattern;
 
 public final class InputValidator {
 
-    private static final Pattern EMAIL_PATTERN =
-            Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
-
     private static final Pattern PASSWORD_PATTERN =
             Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,}$");
 
     private InputValidator() {}
 
-    public static void validateEmail(String email) {
-        if (email == null || email.trim().isEmpty()) {
-            throw new ValidationException("Email cannot be empty.");
+    static final int MAX_USERNAME_LENGTH = 256;
+
+    /** Any non-empty username (email, handle, account number...); no control characters. */
+    public static void validateUsername(String username) {
+        if (username == null || username.trim().isEmpty()) {
+            throw new ValidationException("Username cannot be empty.");
         }
-        email = email.trim();
-        if (!EMAIL_PATTERN.matcher(email).matches()) {
-            throw new ValidationException("Invalid email format.");
+        if (username.length() > MAX_USERNAME_LENGTH) {
+            throw new ValidationException("Username is too long (max " + MAX_USERNAME_LENGTH + " characters).");
+        }
+        if (username.chars().anyMatch(Character::isISOControl)) {
+            throw new ValidationException("Username cannot contain control characters.");
         }
     }
 

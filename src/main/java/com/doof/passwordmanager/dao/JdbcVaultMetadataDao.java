@@ -111,6 +111,47 @@ public class JdbcVaultMetadataDao implements VaultMetadataDao {
         }
     }
 
+    @Override
+    public int recordFailedUnlock(long atMillis) {
+        String update = "UPDATE vault_metadata SET failed_attempts = failed_attempts + 1, last_failed_at = ? WHERE id = 1";
+        String select = "SELECT failed_attempts FROM vault_metadata WHERE id = 1";
+
+        try (Connection conn = connectionManager.getConnection()) {
+            conn.setAutoCommit(false);
+            try (PreparedStatement up = conn.prepareStatement(update);
+                 PreparedStatement sel = conn.prepareStatement(select)) {
+                up.setLong(1, atMillis);
+                if (up.executeUpdate() != 1) {
+                    throw new SQLException("Recording failed unlock failed, no vault metadata.");
+                }
+                int count;
+                try (ResultSet rs = sel.executeQuery()) {
+                    rs.next();
+                    count = rs.getInt(1);
+                }
+                conn.commit();
+                return count;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Error recording failed unlock", e);
+        }
+    }
+
+    @Override
+    public void resetFailedUnlocks() {
+        String sql = "UPDATE vault_metadata SET failed_attempts = 0, last_failed_at = NULL WHERE id = 1";
+
+        try (Connection conn = connectionManager.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Error resetting failed unlocks", e);
+        }
+    }
+
     private static void setNullableLong(PreparedStatement ps, int index, Long value) throws SQLException {
         if (value == null) {
             ps.setNull(index, Types.INTEGER);

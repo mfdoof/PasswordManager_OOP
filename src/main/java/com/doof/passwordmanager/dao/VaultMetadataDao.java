@@ -8,4 +8,8 @@ public interface VaultMetadataDao {
     VaultMetadata find();
     /** Updates all mutable fields of the metadata row and sets the new updatedAt. */
     void update(VaultMetadata metadata);
+    /** Atomically increments failed_attempts and sets last_failed_at; returns the new count. */
+    int recordFailedUnlock(long atMillis);
+    /** Sets failed_attempts to 0 and last_failed_at to NULL. */
+    void resetFailedUnlocks();
 }

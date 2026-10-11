@@ -34,6 +34,11 @@ public class ApplicationConnector {
         entryService.loadIndex();
     }
 
+    /** Failed-attempt count and remaining wait before the next unlock is allowed. */
+    public UnlockStatus getUnlockStatus() {
+        return vaultService.unlockStatus();
+    }
+
     public void lockVault() {
         vaultService.lockVault();
     }
