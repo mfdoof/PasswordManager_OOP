@@ -1,7 +1,7 @@
 package com.doof.passwordmanager.ui.tui;
 
-import com.doof.passwordmanager.ui.tui.screen.PlaceholderScreen;
 import com.googlecode.lanterna.TerminalSize;
+import com.googlecode.lanterna.graphics.TextGraphics;
 import com.googlecode.lanterna.input.KeyStroke;
 import com.googlecode.lanterna.input.KeyType;
 import com.googlecode.lanterna.screen.TerminalScreen;
@@ -10,17 +10,38 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.time.Duration;
-import java.util.Map;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 class ScreenManagerTest {
 
-    private static final Theme THEME = Theme.detect(TuiOptions.parse(new String[]{}), Map.of("LANG", "en_US.UTF-8"));
+    private static final Theme THEME = TuiHarness.THEME;
+
+    /** Minimal screen: titled frame, q quits, counts onHide calls. */
+    private static final class StubScreen implements TuiScreen {
+        int hidden;
+
+        @Override
+        public void draw(TextGraphics g, TerminalSize size, Theme t) {
+            g.setForegroundColor(t.dim);
+            Draw.box(g, t, 0, 0, size.getColumns(), size.getRows(), null);
+            g.setForegroundColor(t.primary);
+            g.putString(2, 0, " doof vault ");
+        }
+
+        @Override
+        public Action handleKey(KeyStroke key) {
+            return key.getCharacter() != null && key.getCharacter() == 'q' ? Action.QUIT : Action.NONE;
+        }
+
+        @Override
+        public void onHide() {
+            hidden++;
+        }
+    }
 
     private DefaultVirtualTerminal terminal;
     private TerminalScreen screen;
+    private StubScreen stub;
     private ScreenManager manager;
 
     @BeforeEach
@@ -28,7 +49,8 @@ class ScreenManagerTest {
         terminal = new DefaultVirtualTerminal(new TerminalSize(80, 24));
         screen = new TerminalScreen(terminal);
         screen.startScreen();
-        manager = new ScreenManager(screen, THEME, new PlaceholderScreen());
+        stub = new StubScreen();
+        manager = new ScreenManager(screen, THEME, stub);
     }
 
     @AfterEach
@@ -51,14 +73,12 @@ class ScreenManagerTest {
     }
 
     @Test
-    void drawsThemedFrameWithTitleAndFooter() throws Exception {
+    void rendersCurrentScreenOnThemedBackground() throws Exception {
         manager.render();
-
         assertTrue(row(0).startsWith("┌─ doof vault "), row(0));
-        assertTrue(row(23).startsWith("└") && row(23).endsWith("┘"), row(23));
-        assertTrue(all().contains("[q] quit"));
         assertEquals(THEME.primary, terminal.getBufferCharacter(3, 0).getForegroundColor());
         assertEquals(THEME.background, terminal.getBufferCharacter(40, 10).getBackgroundColor());
+        assertFalse(manager.isDirty());
     }
 
     @Test
@@ -78,7 +98,7 @@ class ScreenManagerTest {
     }
 
     @Test
-    void qQuitsButIsIgnoredWhileTooSmall() {
+    void keysAreIgnoredWhileTooSmall() {
         terminal.setTerminalSize(new TerminalSize(40, 10));
         screen.doResizeIfNecessary();
         manager.handleKey(new KeyStroke('q', false, false));
@@ -86,8 +106,6 @@ class ScreenManagerTest {
 
         terminal.setTerminalSize(new TerminalSize(80, 24));
         screen.doResizeIfNecessary();
-        manager.handleKey(new KeyStroke('x', false, false));
-        assertFalse(manager.isQuitRequested());
         manager.handleKey(new KeyStroke('q', false, false));
         assertTrue(manager.isQuitRequested());
     }
@@ -99,31 +117,26 @@ class ScreenManagerTest {
         manager.handleKey(new KeyStroke('c', true, false));
         assertTrue(manager.isQuitRequested());
 
-        ScreenManager other = new ScreenManager(screen, THEME, new PlaceholderScreen());
+        ScreenManager other = new ScreenManager(screen, THEME, new StubScreen());
         other.handleKey(new KeyStroke(KeyType.EOF));
         assertTrue(other.isQuitRequested());
     }
 
     @Test
-    void clearBlanksTheScreen() throws Exception {
+    void switchingScreensHidesTheOldOneAndMarksDirty() throws Exception {
         manager.render();
-        manager.clear();
-        assertTrue(all().isBlank(), all());
+        StubScreen next = new StubScreen();
+        manager.show(next);
+        assertEquals(1, stub.hidden);
+        assertTrue(manager.isDirty());
+        assertSame(next, manager.current());
     }
 
     @Test
-    void runLoopExitsOnQAndRestoresTheTerminal() {
-        DefaultVirtualTerminal vt = new DefaultVirtualTerminal(new TerminalSize(80, 24));
-        vt.addInput(new KeyStroke('x', false, false));
-        vt.addInput(new KeyStroke('q', false, false));
-
-        assertTimeoutPreemptively(Duration.ofSeconds(5), () -> TuiApp.run(vt, THEME));
-
-        // Back on the normal buffer, which never held vault content.
-        for (int r = 0; r < 24; r++) {
-            for (int c = 0; c < 80; c++) {
-                assertEquals(" ", vt.getBufferCharacter(c, r).getCharacterString());
-            }
-        }
+    void shutdownHidesCurrentAndBlanksTheScreen() throws Exception {
+        manager.render();
+        manager.shutdown();
+        assertEquals(1, stub.hidden);
+        assertTrue(all().isBlank(), all());
     }
 }

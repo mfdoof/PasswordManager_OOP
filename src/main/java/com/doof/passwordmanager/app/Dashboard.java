@@ -5,6 +5,7 @@ import com.doof.passwordmanager.service.ApplicationConnector;
 import com.doof.passwordmanager.service.InvalidPasswordException;
 import com.doof.passwordmanager.service.UnlockThrottledException;
 import com.doof.passwordmanager.util.InputValidator;
+import com.doof.passwordmanager.util.PasswordPolicy;
 
 import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
@@ -320,7 +321,7 @@ public class Dashboard {
             if (!Arrays.equals(next, confirm)) {
                 throw new IllegalArgumentException("New passwords do not match.");
             }
-            InputValidator.validatePassword(next);
+            PasswordPolicy.validateMaster(next);
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(frame, ex.getMessage(), "Validation", JOptionPane.WARNING_MESSAGE);
             Arrays.fill(current, '\0');

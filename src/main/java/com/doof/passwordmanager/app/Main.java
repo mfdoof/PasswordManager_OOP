@@ -4,7 +4,7 @@ import com.doof.passwordmanager.service.ApplicationConnector;
 import com.doof.passwordmanager.service.InvalidPasswordException;
 import com.doof.passwordmanager.service.UnlockStatus;
 import com.doof.passwordmanager.service.UnlockThrottledException;
-import com.doof.passwordmanager.util.InputValidator;
+import com.doof.passwordmanager.util.PasswordPolicy;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
@@ -119,7 +119,7 @@ public class Main {
 
         JLabel logo = createLabel("DOOF", 48, Font.BOLD);
         JLabel title = createLabel("CREATE MASTER PASSWORD", 22, Font.PLAIN, Color.GRAY);
-        JLabel hint = createLabel("Use a long passphrase (min 8 chars, upper+lower+digit)", 12, Font.PLAIN);
+        JLabel hint = createLabel("Use a long passphrase (min 12 chars, upper+lower+digit)", 12, Font.PLAIN);
 
         setupPasswordField = createPasswordField();
         setupConfirmField = createPasswordField();
@@ -211,7 +211,7 @@ public class Main {
                 return;
             }
             try {
-                InputValidator.validatePassword(pass);
+                PasswordPolicy.validateMaster(pass);
                 createButton.setEnabled(true);
                 setupErrorLabel.setText("");
             } catch (Exception ex) {

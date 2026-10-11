@@ -47,7 +47,7 @@ class EntryServiceTest {
         countingDao = new CountingEntryDao(entryDao);
         vault = new VaultService(new JdbcVaultMetadataDao(cm), new JdbcVaultRotationDao(cm), VaultServiceTest.FAST, java.time.Clock.systemUTC());
         entries = new EntryService(countingDao, vault);
-        vault.createVault("MasterPass1".toCharArray());
+        vault.createVault("MasterPass12".toCharArray());
     }
 
     // --- list / search never expose passwords ---
@@ -96,7 +96,7 @@ class EntryServiceTest {
     void indexIsLoadedOnceAndServesListingWithoutReadingTheDb() {
         entries.addEntry("example.com", "me@example.com", "Hunter2Pass".toCharArray(), null);
         vault.lockVault();
-        vault.unlockVault("MasterPass1".toCharArray());
+        vault.unlockVault("MasterPass12".toCharArray());
         entries.loadIndex();
         int loads = countingDao.findAllCalls.get();
 
@@ -221,7 +221,7 @@ class EntryServiceTest {
     void roundTripThroughLockAndUnlock() {
         long id = entries.addEntry("example.com", "me@example.com", "Hunter2Pass".toCharArray(), null);
         vault.lockVault();
-        vault.unlockVault("MasterPass1".toCharArray());
+        vault.unlockVault("MasterPass12".toCharArray());
 
         EntrySummary e = entries.getEntry(id);
         assertEquals("me@example.com", e.getUser());

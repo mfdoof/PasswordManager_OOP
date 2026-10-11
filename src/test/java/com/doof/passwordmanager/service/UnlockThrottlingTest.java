@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class UnlockThrottlingTest {
 
-    private static final String RIGHT = "MasterPass1";
+    private static final String RIGHT = "MasterPass12";
     private static final String WRONG = "WrongPass1";
 
     @TempDir

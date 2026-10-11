@@ -1,10 +1,12 @@
 package com.doof.passwordmanager.service;
 
+import com.doof.passwordmanager.crypto.KdfParams;
 import com.doof.passwordmanager.dao.EntryDao;
 import com.doof.passwordmanager.dao.VaultMetadataDao;
 import com.doof.passwordmanager.dao.VaultRotationDao;
 import com.doof.passwordmanager.service.EntryService.EntrySummary;
 
+import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
@@ -15,10 +17,16 @@ public class ApplicationConnector {
     private final EntryService entryService;
 
     public ApplicationConnector(VaultMetadataDao vaultMetadataDao, VaultRotationDao rotationDao, EntryDao entryDao) {
+        this(vaultMetadataDao, rotationDao, entryDao, KdfParams.DEFAULT, Clock.systemUTC());
+    }
+
+    /** Full constructor: KDF params for new vaults / rotation and the clock used for throttling (tests). */
+    public ApplicationConnector(VaultMetadataDao vaultMetadataDao, VaultRotationDao rotationDao, EntryDao entryDao,
+                                KdfParams newVaultParams, Clock clock) {
         Objects.requireNonNull(vaultMetadataDao);
         Objects.requireNonNull(rotationDao);
         Objects.requireNonNull(entryDao);
-        this.vaultService = new VaultService(vaultMetadataDao, rotationDao);
+        this.vaultService = new VaultService(vaultMetadataDao, rotationDao, newVaultParams, clock);
         this.entryService = new EntryService(entryDao, vaultService);
     }
 

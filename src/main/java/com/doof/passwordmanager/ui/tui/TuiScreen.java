@@ -13,4 +13,13 @@ public interface TuiScreen {
     void draw(TextGraphics g, TerminalSize size, Theme theme);
 
     Action handleKey(KeyStroke key);
+
+    /** Called on the UI thread every loop iteration; return true if the screen must be redrawn. */
+    default boolean tick(long nowMillis) {
+        return false;
+    }
+
+    /** Called when the screen is replaced or the app quits: wipe any secrets it holds. */
+    default void onHide() {
+    }
 }

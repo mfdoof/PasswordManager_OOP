@@ -24,8 +24,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class VaultRotationTest {
 
-    private static final String OLD = "OldMaster1";
-    private static final String NEW = "NewMaster2";
+    private static final String OLD = "OldMaster123";
+    private static final String NEW = "NewMaster234";
     private static final String WRONG = "WrongPass3";
     private static final KdfParams UPGRADED = new KdfParams(2048, 2, 1);
 

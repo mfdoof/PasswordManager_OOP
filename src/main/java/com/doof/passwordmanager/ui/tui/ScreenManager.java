@@ -9,7 +9,10 @@ import com.googlecode.lanterna.screen.Screen;
 import java.io.IOException;
 import java.util.Objects;
 
-/** Owns the Lanterna screen: current view, global keys, minimum-size check and rendering. */
+/**
+ * Owns the Lanterna screen: current view, global keys, minimum-size check and rendering.
+ * All methods run on the UI thread.
+ */
 public final class ScreenManager {
 
     public static final int MIN_COLUMNS = 80;
@@ -20,6 +23,7 @@ public final class ScreenManager {
     private final Theme theme;
     private TuiScreen current;
     private boolean quitRequested;
+    private boolean dirty = true;
 
     public ScreenManager(Screen screen, Theme theme, TuiScreen initial) {
         this.screen = Objects.requireNonNull(screen);
@@ -27,27 +31,52 @@ public final class ScreenManager {
         this.current = Objects.requireNonNull(initial);
     }
 
+    /** Replaces the current screen; the old one wipes its secrets. */
     public void show(TuiScreen next) {
-        current = Objects.requireNonNull(next);
+        Objects.requireNonNull(next);
+        if (next != current) {
+            current.onHide();
+            current = next;
+        }
+        dirty = true;
     }
 
-    /** Returns true if the screen should be redrawn. */
-    public boolean handleKey(KeyStroke key) {
+    public TuiScreen current() {
+        return current;
+    }
+
+    public void handleKey(KeyStroke key) {
         // Raw mode: Ctrl+C arrives as a key, not a signal. Treat it (and EOF) as quit everywhere.
         if (key.getKeyType() == KeyType.EOF
                 || (key.isCtrlDown() && key.getCharacter() != null && Character.toLowerCase(key.getCharacter()) == 'c')) {
             quitRequested = true;
-            return false;
+            return;
         }
         if (tooSmall(screen.getTerminalSize())) {
-            return false;  // only the size message is visible; ignore input until resized
+            return;  // only the size message is visible; ignore input until resized
         }
-        TuiScreen.Action action = current.handleKey(key);
+        TuiScreen before = current;
+        TuiScreen.Action action = before.handleKey(key);
         if (action == TuiScreen.Action.QUIT) {
             quitRequested = true;
-            return false;
+        } else if (action == TuiScreen.Action.REDRAW || current != before) {
+            dirty = true;
         }
-        return action == TuiScreen.Action.REDRAW;
+    }
+
+    public void tick(long nowMillis) {
+        TuiScreen before = current;
+        if (before.tick(nowMillis) || current != before) {
+            dirty = true;
+        }
+    }
+
+    public void markDirty() {
+        dirty = true;
+    }
+
+    public boolean isDirty() {
+        return dirty;
     }
 
     public boolean isQuitRequested() {
@@ -55,6 +84,7 @@ public final class ScreenManager {
     }
 
     public void render() throws IOException {
+        dirty = false;
         TerminalSize size = screen.getTerminalSize();
         TextGraphics g = screen.newTextGraphics();
         g.setBackgroundColor(theme.background);
@@ -69,7 +99,13 @@ public final class ScreenManager {
         screen.refresh();
     }
 
-    /** Blanks the screen so no vault data is left behind (used on quit and, later, on lock). */
+    /** Wipes the current screen's secrets and blanks the terminal (quit). */
+    public void shutdown() throws IOException {
+        current.onHide();
+        clear();
+    }
+
+    /** Blanks the screen so no vault data is left behind. */
     public void clear() throws IOException {
         screen.clear();
         screen.refresh(Screen.RefreshType.COMPLETE);

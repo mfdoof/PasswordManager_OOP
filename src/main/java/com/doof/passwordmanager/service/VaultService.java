@@ -9,7 +9,7 @@ import com.doof.passwordmanager.dao.VaultMetadataDao;
 import com.doof.passwordmanager.dao.VaultRotationDao;
 import com.doof.passwordmanager.model.Entry;
 import com.doof.passwordmanager.model.VaultMetadata;
-import com.doof.passwordmanager.util.InputValidator;
+import com.doof.passwordmanager.util.PasswordPolicy;
 
 import java.security.MessageDigest;
 import java.time.Clock;
@@ -107,6 +107,7 @@ class VaultService {
         byte[] authKey = null;
         byte[] newEncKey = null;
         try {
+            PasswordPolicy.validateMaster(masterPassword);
             if (isVaultInitialized()) {
                 throw new RuntimeException("Vault already exists");
             }
@@ -176,7 +177,7 @@ class VaultService {
             byte[] newMaster = null;
             byte[] newEncKey = null;
             try {
-                InputValidator.validatePassword(newPassword);
+                PasswordPolicy.validateMaster(newPassword);
                 VaultMetadata meta = requireMetadata();
                 oldMaster = verifyMasterPassword(meta, oldPassword);
                 oldEncKey = KeyHierarchy.encKey(oldMaster);

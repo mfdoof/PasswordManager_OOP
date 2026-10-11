@@ -36,7 +36,7 @@ class VaultServiceTest {
 
     @Test
     void createLeavesVaultUnlockedAndStoresArgon2Metadata() {
-        vault.createVault("MasterPass1".toCharArray());
+        vault.createVault("MasterPass12".toCharArray());
 
         assertTrue(vault.isUnlocked());
         VaultMetadata m = dao.find();
@@ -48,24 +48,24 @@ class VaultServiceTest {
 
     @Test
     void createWipesThePasswordArray() {
-        char[] pw = "MasterPass1".toCharArray();
+        char[] pw = "MasterPass12".toCharArray();
         vault.createVault(pw);
         assertArrayEquals(new char[pw.length], pw);
     }
 
     @Test
     void unlockWithCorrectPasswordAfterLock() {
-        vault.createVault("MasterPass1".toCharArray());
+        vault.createVault("MasterPass12".toCharArray());
         vault.lockVault();
         assertFalse(vault.isUnlocked());
 
-        vault.unlockVault("MasterPass1".toCharArray());
+        vault.unlockVault("MasterPass12".toCharArray());
         assertTrue(vault.isUnlocked());
     }
 
     @Test
     void wrongPasswordIsRejectedAndVaultStaysLocked() {
-        vault.createVault("MasterPass1".toCharArray());
+        vault.createVault("MasterPass12".toCharArray());
         vault.lockVault();
 
         RuntimeException e = assertThrows(RuntimeException.class, () -> vault.unlockVault("MasterPass2".toCharArray()));
@@ -75,29 +75,29 @@ class VaultServiceTest {
 
     @Test
     void unlockUsesParamsStoredInKdfParamsNotCurrentDefaults() {
-        vault.createVault("MasterPass1".toCharArray());
+        vault.createVault("MasterPass12".toCharArray());
         vault.lockVault();
 
         // A build with different defaults must still unlock an existing vault.
         VaultService otherDefaults = new VaultService(dao, rotationDao, new KdfParams(2048, 2, 1), Clock.systemUTC());
-        otherDefaults.unlockVault("MasterPass1".toCharArray());
+        otherDefaults.unlockVault("MasterPass12".toCharArray());
         assertTrue(otherDefaults.isUnlocked());
         assertEquals(FAST, KdfParams.fromJson(dao.find().getKdfParams()));
     }
 
     @Test
     void sameEncKeyAfterReunlock() {
-        vault.createVault("MasterPass1".toCharArray());
+        vault.createVault("MasterPass12".toCharArray());
         byte[] first = vault.withEncKey(byte[]::clone);
         vault.lockVault();
-        vault.unlockVault("MasterPass1".toCharArray());
+        vault.unlockVault("MasterPass12".toCharArray());
         assertArrayEquals(first, vault.withEncKey(byte[]::clone));
         assertFalse(java.util.Arrays.equals(first, dao.find().getAuthHash()), "enc key must differ from stored auth key");
     }
 
     @Test
     void lockWipesTheEncKey() {
-        vault.createVault("MasterPass1".toCharArray());
+        vault.createVault("MasterPass12".toCharArray());
         AtomicReference<byte[]> keyRef = new AtomicReference<>();
         vault.withEncKey(k -> { keyRef.set(k); return null; });  // test-only: peek at the live array
         assertNotEquals(0, sum(keyRef.get()));
@@ -110,14 +110,14 @@ class VaultServiceTest {
 
     @Test
     void cachedMetadataSaltIsNotWiped() {
-        vault.createVault("MasterPass1".toCharArray());
+        vault.createVault("MasterPass12".toCharArray());
         assertArrayEquals(dao.find().getKdfSalt(), vault.getMetadata().getKdfSalt());
         assertNotEquals(0, sum(vault.getMetadata().getKdfSalt()));
     }
 
     @Test
     void autoLockThreadIsDaemon() {
-        vault.createVault("MasterPass1".toCharArray());  // starts the auto-lock timer
+        vault.createVault("MasterPass12".toCharArray());  // starts the auto-lock timer
         Thread t = Thread.getAllStackTraces().keySet().stream()
                 .filter(th -> th.getName().equals("doof-autolock"))
                 .findFirst().orElseThrow();
@@ -126,8 +126,8 @@ class VaultServiceTest {
 
     @Test
     void secondCreateIsRejected() {
-        vault.createVault("MasterPass1".toCharArray());
-        assertThrows(RuntimeException.class, () -> vault.createVault("MasterPass1".toCharArray()));
+        vault.createVault("MasterPass12".toCharArray());
+        assertThrows(RuntimeException.class, () -> vault.createVault("MasterPass12".toCharArray()));
     }
 
     private static int sum(byte[] b) {

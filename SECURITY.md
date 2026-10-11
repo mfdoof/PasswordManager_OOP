@@ -23,7 +23,7 @@ Please report vulnerabilities privately through GitHub: **Security → Report a 
 **Not protected (out of scope)**
 
 - **A compromised host.** Keyloggers, malware, a root user, or anyone who can read process memory or attach a debugger can capture the master password or keys while the vault is unlocked.
-- **Weak master passwords.** Argon2id slows guessing but cannot save a password that is in a wordlist.
+- **Weak master passwords.** Argon2id slows guessing but cannot save a password that is in a wordlist. Creating or changing the master password requires 12+ characters with upper case, lower case and a digit (enforced in `VaultService`); the strength bar in the UI is a rough estimate, not a guarantee.
 - **Metadata.** The file shows how many entries exist, when they were created/updated, and roughly how long each entry's contents are (ciphertext length).
 - **Storage remnants.** SQLite `secure_delete` zeroes freed pages, but SSD wear-levelling, filesystem snapshots, backups and old journal files are outside the app's control.
 
