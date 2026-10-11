@@ -1,6 +1,6 @@
 # DOOF Vault — System Design & Architecture
 
-Target design for the hardened password manager. Describes where the project is going; see `HANDOFF.md` for current status.
+Design of the hardened password manager. Phase 1 (hardening) is implemented; the UI described in §9 is the Phase 2 target (the current UI is still Swing). See `SECURITY.md` for the threat model and known limitations.
 
 ## 1. Goals
 - Local, single-user password vault with strong, modern crypto.
@@ -28,37 +28,39 @@ Target design for the hardened password manager. Describes where the project is 
 ## 4. Layered architecture
 ```
 ┌──────────────────────────────────────────────┐
-│ ui        Lanterna screens (Unlock, Vault,     │
-│           Entry modal), keybindings, theme     │
+│ ui        Lanterna screens (Unlock, Vault,   │
+│           Entry modal), keybindings, theme   │
 ├──────────────────────────────────────────────┤
-│ service   VaultService (create/unlock/lock/    │
-│           rotate, auto-lock, throttling)       │
-│           EntryService (CRUD, search, reveal)  │
+│ service   VaultService (create/unlock/lock/  │
+│           rotate, auto-lock, throttling)     │
+│           EntryService (CRUD, search, reveal)│
 ├──────────────────────────────────────────────┤
-│ crypto    Kdf (Argon2id), KeyHierarchy (HKDF), │
-│           Cipher (AES-GCM), SecureWipe         │
+│ crypto    Kdf + KdfParams (Argon2id),        │
+│           KeyHierarchy (HKDF), AesGcm,       │
+│           SecureWipe                         │
 ├──────────────────────────────────────────────┤
-│ dao       VaultMetadataDao, EntryDao (JDBC)    │
+│ dao       VaultMetadataDao, EntryDao,        │
+│           VaultRotationDao (JDBC)            │
 ├──────────────────────────────────────────────┤
-│ db        ConnectionManager (SQLite file,      │
-│           path + permission checks)            │
+│ db        ConnectionManager (SQLite file,    │
+│           path + permission checks)          │
 └──────────────────────────────────────────────┘
 ```
 Rules:
 - UI talks only to services. Services own all crypto. DAOs store/load opaque bytes only and never see plaintext.
-- Package root: `com.doof.passwordmanager` (`ui`, `service`, `crypto`, `dao`, `db`, `model`, `util`).
+- Package root: `com.doof.passwordmanager` (`ui`, `service`, `crypto`, `dao`, `db`, `model`, `util`). Until Phase 2 the UI layer is the Swing `app` package.
 
 ## 5. Cryptographic design
 ```
 master password ──Argon2id(salt, params)──► master key (32 B, memory only)
-                                             ├─ HKDF(info="doof-auth") ──► auth key ──► stored as auth hash
+                                             ├─ HKDF(info="doof-auth") ──► auth key ──► stored in auth_hash
                                              └─ HKDF(info="doof-enc")  ──► AES-256 key (memory only)
 ```
-- **Argon2id params (default):** memory 64 MiB, iterations 3, parallelism 1, salt 16 B, output 32 B. Stored per vault in `kdf_params` (JSON) so they can be raised later.
-- **Unlock:** recompute auth key, constant-time compare with stored hash. Encryption key never written to disk.
-- **Entry encryption:** each field blob (site, username, password, notes) encrypted with AES-256-GCM, fresh random 12-byte IV per encryption. Entry `id` bound as AAD to stop ciphertext swapping between rows.
-- **Wiping:** `char[]`/`byte[]` for secrets, zeroed after use. Master key and enc key wiped on lock.
-- **Versioning:** `enc_version` on metadata and entries to allow future algorithm changes.
+- **Argon2id params (default):** memory 64 MiB, iterations 3, parallelism 1, salt 16 B, output 32 B. Stored per vault in `kdf_params` (JSON, bounds-checked on read) so they can be raised later; rotation re-derives with the current defaults.
+- **Unlock:** recompute auth key, constant-time compare with `auth_hash`. HKDF without salt (the master key is already salted). Encryption key never written to disk.
+- **Entry encryption:** all fields (site, username, password, notes) serialized as one JSON object and encrypted with AES-256-GCM, fresh random 12-byte IV per encryption. AAD = `"doof-entry"` + 8-byte big-endian entry `id`, to stop ciphertext swapping between rows. Ids come from `AUTOINCREMENT` so they are never reused. New entries get their id first, then are encrypted, in one transaction.
+- **Wiping:** `char[]`/`byte[]` for secrets, zeroed after use. Master key wiped right after the HKDF split; enc key held only by `VaultService` and wiped on lock. (The JCA's internal key copies can't be zeroed; see `SECURITY.md`.)
+- **Versioning:** `enc_version` (currently 1) on metadata and entries, and the schema version in `PRAGMA user_version` (currently 2), to allow future changes. Unknown versions are refused.
 
 ## 6. Data model (SQLite)
 ```sql
@@ -83,21 +85,23 @@ CREATE TABLE entries (
   updated_at   INTEGER NOT NULL
 );
 ```
-- All entry fields are encrypted together; the DB reveals only entry count and timestamps.
-- Search runs in memory over decrypted site/user after unlock. Passwords are decrypted only on reveal/copy.
+- Schema is a resource (`src/main/resources/db/schema.sql`) applied once when a vault file is created.
+- All entry fields are encrypted together; the DB reveals only entry count, timestamps and ciphertext lengths.
+- After unlock an in-memory index holds only site/user (for listing and search); it is dropped on lock. Passwords and notes are decrypted only on reveal/copy.
 
 ## 7. Storage & file security
 - Default path: `~/.doof/vault.db` (override with `DOOF_VAULT_PATH` env var or `--vault <path>`).
-- Directory `700`, file `600` on create. On open, warn if group/other have any access (POSIX systems).
+- Directory `700`, file `600` on create (the app creates the file before SQLite opens it). On open, warn if group/other have any access to the file or its directory (POSIX systems).
+- `PRAGMA secure_delete = ON` so deleted entries are overwritten inside the file.
 - No credentials in code or config: SQLite has no DB users.
 
 ## 8. Session & runtime behavior
-- **Auto-lock:** 5 min idle (reset on keypress). Lock wipes keys and returns to Unlock screen.
-- **Throttling:** after each failed unlock, exponential delay (1s, 2s, 4s… capped 30s); counter persisted in `vault_metadata` so restarting doesn't reset it.
+- **Auto-lock:** 5 min idle (reset on keypress). Lock wipes keys and returns to Unlock screen. *(Phase 1 Swing: fixed 5 min after unlock, not reset on activity.)*
+- **Throttling:** after the n-th consecutive failed unlock, the next attempt waits min(1s·2^(n-1), 30s); counter persisted in `vault_metadata` (written before the error is reported) so restarting doesn't reset it. Attempts during the wait are refused before the KDF runs and not counted. Reset on success. Enforced in `VaultService`, not the UI. Does not protect a copied file (see §10).
 - **Clipboard:** `c` copies via Java AWT clipboard when a desktop session exists; auto-clears after 20s. If unavailable (SSH/headless), status bar says `clipboard unavailable — press [s] to reveal`.
 - **Reveal:** `s` shows password for 10s then re-masks. Works everywhere.
 - **Paste:** typing/pasting into fields works everywhere (terminal sends keystrokes).
-- **Rotation:** change master password → new salt, new keys, re-encrypt all entries in one SQLite transaction; rollback on any failure.
+- **Rotation:** change master password → verify old password (same throttling as unlock), new salt, new keys with current default params, re-encrypt all entries (same ids/AAD) and replace metadata in one SQLite transaction; rollback on any failure. Session continues with the new key.
 
 ## 9. TUI design
 Palette: bg `#0d0b14`, text `#e0d7f5`, primary `#a277ff`, dim `#6b5b95`, success `#61ffca`, error `#ff6188`.
@@ -114,6 +118,8 @@ Keys: `j/k`/arrows move, `/` search, `a` add, `e` edit, `d` delete (inline `[y/N
 |---|---|
 | Stolen vault file | All entry data AES-GCM encrypted; Argon2id makes offline guessing expensive |
 | Online guessing at unlock | Persistent exponential throttling |
+| Offline guessing on a copied file | Argon2id cost + strong master password only (throttling does not apply) |
+| Failed master password change | Single transaction; old password keeps working |
 | Ciphertext tampering / row swap | GCM auth tag + entry id as AAD |
 | Unattended unlocked session | Auto-lock + key wiping |
 | Clipboard snooping | 20s auto-clear; reveal-only fallback |
@@ -121,6 +127,6 @@ Keys: `j/k`/arrows move, `/` search, `a` add, `e` edit, `d` delete (inline `[y/N
 | **Out of scope** | Compromised host (keylogger, memory dump, root attacker) |
 
 ## 11. Roadmap
-- **Phase 1 – Hardening:** Maven → SQLite → crypto → encrypted fields → on-demand decrypt → throttling → rotation → SECURITY.md/README.
+- **Phase 1 – Hardening (done):** Maven → SQLite → crypto → encrypted fields → on-demand decrypt → throttling → rotation → SECURITY.md/README.
 - **Phase 2 – TUI:** Lanterna UI per §9, remove Swing.
 - **Phase 3 – Deployment:** homelab deploy, encrypted backups, file-ownership hardening.

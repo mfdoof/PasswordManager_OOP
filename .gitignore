@@ -40,3 +40,5 @@ target/
 *.db-journal
 *.db-wal
 *.db-shm
+CLAUDE.md
+HANDOFF.md
