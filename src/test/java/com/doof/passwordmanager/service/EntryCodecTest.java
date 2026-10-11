@@ -21,7 +21,7 @@ class EntryCodecTest {
 
     @Test
     void roundTripsSpecialCharactersAndNulls() {
-        String tricky = "q\"uote \\back/slash \t\r\b\f \u0001 ünïcødé 🔑 {\"x\":1},";
+        String tricky = "q\"uote \\back/slash \t\r\b\f \u0001 ünïcødé \uD834\uDD1E {\"x\":1},";
         byte[] json = EntryCodec.encode("site", "user", tricky.toCharArray(), null);
 
         assertEquals(tricky, new String(EntryCodec.decodePassword(json)));

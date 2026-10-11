@@ -40,7 +40,7 @@ DOOF_VAULT_PATH=/path/to/vault.db java -jar target/doof-vault-0.1.0-SNAPSHOT.jar
 
 The order of precedence is `--vault`, then `DOOF_VAULT_PATH`, then `~/.doof/vault.db`.
 
-The current UI is the original Swing app. A minimal console harness, used for testing, is also included:
+The JAR now starts the terminal UI (Phase 2, in progress; currently a skeleton). Flags: `--ascii` for plain `+ - |` borders, `--no-color` (or `NO_COLOR`) for monochrome. Until the TUI is complete, the original Swing app is still available with `--swing`. A minimal console harness, used for testing, is also included:
 
 ```bash
 java -cp target/doof-vault-0.1.0-SNAPSHOT.jar com.doof.passwordmanager.service.ConsolePasswordManager --vault /tmp/test.db

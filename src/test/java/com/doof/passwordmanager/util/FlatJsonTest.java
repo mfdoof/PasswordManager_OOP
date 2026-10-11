@@ -34,13 +34,13 @@ class FlatJsonTest {
     @Test
     void secretValuesRoundTripAsCharArrays() {
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("pw", "s\"ecr\\et🔑".toCharArray());
+        m.put("pw", "s\"ecr\\et\uD834\uDD1E".toCharArray());
         m.put("other", "x");
         byte[] json = FlatJson.writeUtf8(m);
 
         Map<String, Object> back = FlatJson.parseUtf8(json, k -> k.equals("pw") ? Mode.SECRET : Mode.SKIP);
         assertEquals(1, back.size(), "skipped keys must be absent");
-        assertArrayEquals("s\"ecr\\et🔑".toCharArray(), (char[]) back.get("pw"));
+        assertArrayEquals("s\"ecr\\et\uD834\uDD1E".toCharArray(), (char[]) back.get("pw"));
     }
 
     @Test
