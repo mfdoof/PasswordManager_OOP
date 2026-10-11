@@ -27,23 +27,23 @@ Each choice answers a specific threat: a stolen vault file, guessing, tampering,
 ## Build and run
 
 ```bash
-mvn package                                   # builds and runs the tests
-java -jar target/doof-vault-0.1.0-SNAPSHOT.jar
+mvn package                     # runs the tests, builds target/doof-vault.jar
+java -jar target/doof-vault.jar
 ```
 
 The first run creates a new vault. Choose where it lives with:
 
 ```bash
-java -jar target/doof-vault-0.1.0-SNAPSHOT.jar --vault /path/to/vault.db
-DOOF_VAULT_PATH=/path/to/vault.db java -jar target/doof-vault-0.1.0-SNAPSHOT.jar
+java -jar target/doof-vault.jar --vault /path/to/vault.db
+DOOF_VAULT_PATH=/path/to/vault.db java -jar target/doof-vault.jar
 ```
 
 The order of precedence is `--vault`, then `DOOF_VAULT_PATH`, then `~/.doof/vault.db`.
 
-The JAR now starts the terminal UI (Phase 2, in progress: create and unlock screens work; the vault view is next). Flags: `--ascii` for plain `+ - |` borders, `--no-color` (or `NO_COLOR`) for monochrome. Until the TUI is complete, the original Swing app is still available with `--swing`. A minimal console harness, used for testing, is also included:
+The JAR now starts the terminal UI (Phase 2, in progress: create, unlock and the vault list with search work; reveal/copy and editing are next). Flags: `--ascii` for plain `+ - |` borders, `--no-color` (or `NO_COLOR`) for monochrome. Until the TUI is complete, the original Swing app is still available with `--swing`. A minimal console harness, used for testing, is also included:
 
 ```bash
-java -cp target/doof-vault-0.1.0-SNAPSHOT.jar com.doof.passwordmanager.service.ConsolePasswordManager --vault /tmp/test.db
+java -cp target/doof-vault.jar com.doof.passwordmanager.service.ConsolePasswordManager --vault /tmp/test.db
 ```
 
 ## Tests

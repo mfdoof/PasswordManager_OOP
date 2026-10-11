@@ -59,7 +59,7 @@ public final class TuiApp {
             return t;
         });
         TuiContext ctx = new TuiContext(connector, displayPath(cm.getVaultPath(), System.getProperty("user.home")),
-                warnings, worker, System::currentTimeMillis);
+                warnings, worker, System::currentTimeMillis, java.time.ZoneId.systemDefault());
 
         Theme theme = Theme.detect(options, System.getenv());
         Charset charset = theme.unicode() ? StandardCharsets.UTF_8 : Charset.defaultCharset();

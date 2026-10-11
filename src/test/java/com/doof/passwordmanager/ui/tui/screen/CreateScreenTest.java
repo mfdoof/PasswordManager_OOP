@@ -103,7 +103,7 @@ class CreateScreenTest {
 
         assertTrue(h.connector.isVaultInitialized());
         assertTrue(h.connector.isUnlocked());
-        assertInstanceOf(VaultPlaceholderScreen.class, h.manager.current());
+        assertInstanceOf(VaultScreen.class, h.manager.current());
         assertTrue(h.text().contains("[UNLOCKED]"));
     }
 
@@ -123,7 +123,7 @@ class CreateScreenTest {
             assertFalse(slow.text().contains("*"), "fields were taken and input is disabled");
 
             slow.runWorker();
-            assertInstanceOf(VaultPlaceholderScreen.class, slow.manager.current());
+            assertInstanceOf(VaultScreen.class, slow.manager.current());
         } finally {
             slow.close();
         }

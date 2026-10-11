@@ -105,7 +105,7 @@ public final class CreateScreen implements TuiScreen {
             Outcome o = pending.join();
             pending = null;
             if (o.kind == Outcome.Kind.OK) {
-                ctx.show(new VaultPlaceholderScreen(ctx));
+                ctx.show(new VaultScreen(ctx, "ok: vault created"));
             } else {
                 message = "err: could not create vault: " + o.error;
             }

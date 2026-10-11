@@ -60,7 +60,7 @@ class UnlockScreenTest {
         h.type(RIGHT);
         h.press(KeyType.Enter);
         assertTrue(h.connector.isUnlocked());
-        assertInstanceOf(VaultPlaceholderScreen.class, h.manager.current());
+        assertInstanceOf(VaultScreen.class, h.manager.current());
     }
 
     @Test
@@ -134,7 +134,7 @@ class UnlockScreenTest {
             assertFalse(slow.text().contains("***"), "input ignored while working");
 
             slow.runWorker();
-            assertInstanceOf(VaultPlaceholderScreen.class, slow.manager.current());
+            assertInstanceOf(VaultScreen.class, slow.manager.current());
         } finally {
             slow.close();
         }

@@ -43,7 +43,7 @@ public final class TuiHarness {
         connector = new ApplicationConnector(new JdbcVaultMetadataDao(cm, clock), new JdbcVaultRotationDao(cm, clock),
                 new JdbcEntryDao(cm, clock), FAST, clock);
         Executor worker = inlineWorker ? Runnable::run : queued::add;
-        ctx = new TuiContext(connector, "~/.doof/vault.db", warnings, worker, clock::millis);
+        ctx = new TuiContext(connector, "~/.doof/vault.db", warnings, worker, clock::millis, java.time.ZoneOffset.UTC);
         try {
             screen = new TerminalScreen(terminal);
             screen.startScreen();
@@ -91,6 +91,14 @@ public final class TuiHarness {
 
     public int queuedJobs() {
         return queued.size();
+    }
+
+    /** Resizes the virtual terminal and lets the screen pick it up, like the main loop does. */
+    public void resize(int columns, int rows) {
+        terminal.setTerminalSize(new TerminalSize(columns, rows));
+        screen.doResizeIfNecessary();
+        manager.markDirty();
+        render();
     }
 
     public void render() {

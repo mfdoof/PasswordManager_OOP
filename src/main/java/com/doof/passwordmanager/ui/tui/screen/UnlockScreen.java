@@ -131,7 +131,7 @@ public final class UnlockScreen implements TuiScreen {
 
     private void apply(Outcome o, long now) {
         switch (o.kind) {
-            case OK -> ctx.show(new VaultPlaceholderScreen(ctx));
+            case OK -> ctx.show(new VaultScreen(ctx, "ok: vault unlocked"));
             case INVALID -> {
                 message = "err: invalid password (attempt " + o.failedAttempts + ")";
                 waitUntil = o.retryAfterMs > 0 ? now + o.retryAfterMs : 0;
