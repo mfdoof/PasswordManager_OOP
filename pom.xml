@@ -15,10 +15,10 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <main.class>com.doof.passwordmanager.ui.tui.TuiApp</main.class>
 
-        <sqlite-jdbc.version>3.46.1.3</sqlite-jdbc.version>
+        <sqlite-jdbc.version>3.53.4.0</sqlite-jdbc.version>
         <bouncycastle.version>1.86</bouncycastle.version>
         <junit.version>6.1.3</junit.version>
-        <lanterna.version>3.1.2</lanterna.version>
+        <lanterna.version>3.1.5</lanterna.version>
     </properties>
 
     <dependencies>
@@ -73,7 +73,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.6.0</version>
+                <version>3.6.2</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
