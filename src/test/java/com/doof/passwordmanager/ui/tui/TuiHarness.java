@@ -7,6 +7,8 @@ import com.doof.passwordmanager.dao.JdbcVaultRotationDao;
 import com.doof.passwordmanager.db.ConnectionManager;
 import com.doof.passwordmanager.service.ApplicationConnector;
 import com.doof.passwordmanager.testutil.MutableClock;
+import com.doof.passwordmanager.ui.tui.clip.ClipboardBackend;
+import com.doof.passwordmanager.ui.tui.clip.SecureClipboard;
 import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.input.KeyStroke;
 import com.googlecode.lanterna.input.KeyType;
@@ -30,7 +32,17 @@ public final class TuiHarness {
     public static final KdfParams FAST = new KdfParams(1024, 1, 1);
     public static final Theme THEME = Theme.detect(TuiOptions.parse(new String[]{}), Map.of("LANG", "en_US.UTF-8"));
 
+    /** In-memory system clipboard; null when the harness simulates a headless/SSH session. */
+    public static final class FakeClipboard implements ClipboardBackend {
+        public String text;
+        public int writes;
+
+        @Override public void setText(String t) { text = t; writes++; }
+        @Override public String getText() { return text; }
+    }
+
     public final MutableClock clock = new MutableClock(1_700_000_000_000L);
+    public final FakeClipboard clipboard;
     public final ApplicationConnector connector;
     public final DefaultVirtualTerminal terminal = new DefaultVirtualTerminal(new TerminalSize(80, 24));
     public final TuiContext ctx;
@@ -39,11 +51,17 @@ public final class TuiHarness {
     private final TerminalScreen screen;
 
     public TuiHarness(Path vaultFile, boolean inlineWorker, List<String> warnings) {
+        this(vaultFile, inlineWorker, warnings, true);
+    }
+
+    public TuiHarness(Path vaultFile, boolean inlineWorker, List<String> warnings, boolean withClipboard) {
+        clipboard = withClipboard ? new FakeClipboard() : null;
         ConnectionManager cm = ConnectionManager.open(vaultFile, w -> {});
         connector = new ApplicationConnector(new JdbcVaultMetadataDao(cm, clock), new JdbcVaultRotationDao(cm, clock),
                 new JdbcEntryDao(cm, clock), FAST, clock);
         Executor worker = inlineWorker ? Runnable::run : queued::add;
-        ctx = new TuiContext(connector, "~/.doof/vault.db", warnings, worker, clock::millis, java.time.ZoneOffset.UTC);
+        ctx = new TuiContext(connector, "~/.doof/vault.db", warnings, worker, clock::millis, java.time.ZoneOffset.UTC,
+                new SecureClipboard(() -> clipboard));
         try {
             screen = new TerminalScreen(terminal);
             screen.startScreen();
@@ -74,6 +92,9 @@ public final class TuiHarness {
 
     /** One loop iteration without input: tick + render. */
     public void tick() {
+        if (ctx.clipboard.tick(clock.millis())) {
+            manager.markDirty();
+        }
         manager.tick(clock.millis());
         render();
     }

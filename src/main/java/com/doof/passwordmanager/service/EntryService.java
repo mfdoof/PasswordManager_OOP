@@ -114,6 +114,20 @@ public class EntryService {
         }
     }
 
+    /**
+     * Decrypts the notes of entry {@code id} (null if none) as a char[], passes them to {@code use},
+     * and wipes them as soon as {@code use} returns. {@code use} must not keep the array.
+     */
+    public synchronized <T> T withNotes(long id, Function<char[], T> use) {
+        Objects.requireNonNull(use);
+        char[] notes = decrypt(require(id), EntryCodec::decodeNotesChars);
+        try {
+            return use.apply(notes);
+        } finally {
+            SecureWipe.wipe(notes);
+        }
+    }
+
     /** Decrypts the notes of entry {@code id} on demand; null if none. */
     public synchronized String revealNotes(long id) {
         return decrypt(require(id), EntryCodec::decodeNotes);

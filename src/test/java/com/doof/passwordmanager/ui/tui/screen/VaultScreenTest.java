@@ -58,7 +58,7 @@ class VaultScreenTest {
         String s = h.text();
         assertTrue(line(0).contains(" doof vault ") && line(0).contains("[UNLOCKED]"), line(0));
         assertTrue(s.contains("SITE") && s.contains("USERNAME") && s.contains("UPDATED"));
-        assertTrue(s.contains("[j/k]move [/]search [l]ock [?]help [q]uit"));
+        assertTrue(s.contains("[/]search [s]reveal [c]opy [l]ock [?]help [q]uit"));
         assertTrue(s.contains("1 entry"));
         assertTrue(s.contains(" details "));
     }

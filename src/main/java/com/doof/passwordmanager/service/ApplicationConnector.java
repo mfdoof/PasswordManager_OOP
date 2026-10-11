@@ -94,6 +94,11 @@ public class ApplicationConnector {
         return entryService.withPassword(id, use);
     }
 
+    /** Decrypts the notes on demand (null if none); they are wiped as soon as {@code use} returns. */
+    public <T> T withNotes(long id, Function<char[], T> use) {
+        return entryService.withNotes(id, use);
+    }
+
     public String revealNotes(long id) {
         return entryService.revealNotes(id);
     }

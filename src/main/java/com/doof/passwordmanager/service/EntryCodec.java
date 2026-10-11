@@ -57,6 +57,12 @@ final class EntryCodec {
         return v == null ? new char[0] : (char[]) v;
     }
 
+    /** The notes as a char[] the caller must wipe; null if there are none. */
+    static char[] decodeNotesChars(byte[] json) {
+        Map<String, Object> m = parse(json, key -> NOTES.equals(key) ? Mode.SECRET : Mode.SKIP);
+        return (char[]) m.get(NOTES);
+    }
+
     static String decodeNotes(byte[] json) {
         Map<String, Object> m = parse(json, key -> NOTES.equals(key) ? Mode.VALUE : Mode.SKIP);
         return string(m, NOTES);

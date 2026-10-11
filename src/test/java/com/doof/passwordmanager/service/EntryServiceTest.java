@@ -178,6 +178,17 @@ class EntryServiceTest {
     }
 
     @Test
+    void withNotesGivesCharsAndWipesThem() {
+        long id = entries.addEntry("example.com", "me@example.com", "Hunter2Pass".toCharArray(), "line1\nline2");
+        long none = entries.addEntry("other.org", "me@example.com", "Hunter2Pass".toCharArray(), null);
+        AtomicReference<char[]> seen = new AtomicReference<>();
+
+        assertEquals("line1\nline2", entries.withNotes(id, n -> { seen.set(n); return new String(n); }));
+        assertArrayEquals(new char["line1\nline2".length()], seen.get());
+        assertNull(entries.withNotes(none, n -> n));
+    }
+
+    @Test
     void updateKeepsPasswordAndNotesWhenNotGiven() {
         long id = entries.addEntry("example.com", "me@example.com", "Hunter2Pass".toCharArray(), "keep me");
         byte[] ivBefore = entryDao.findById(id).getIv();

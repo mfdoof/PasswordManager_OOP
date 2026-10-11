@@ -20,20 +20,24 @@ import java.util.Map;
 
 /**
  * docs/TUI_DESIGN.md §3.3: entry list, live search, details pane, footer and status bar.
- * Holds only site/user summaries; passwords and notes are never loaded here (reveal comes in step 4).
+ * Holds only site/user summaries. A password or notes are decrypted only on [s]/[n]/[c], kept as
+ * char[] for at most 10s while shown, and wiped on re-mask, selection change, search, lock or quit.
  */
 public final class VaultScreen implements TuiScreen {
 
     static final String TITLE = "doof vault";
     static final String STATE = "[UNLOCKED]";
     static final String MASK = "************";  // fixed length: does not reveal the password length
-    static final String FOOTER = "[j/k]move [/]search [l]ock [?]help [q]uit";
+    static final String FOOTER = "[/]search [s]reveal [c]opy [l]ock [?]help [q]uit";
+    static final String PASSWORD_HINTS = "[s] reveal  [c] copy  [u] copy user";
+    static final String NOTES_HINT = "[n] show notes";
+    static final String NO_CLIPBOARD = "err: clipboard unavailable - press [s] to reveal";
+    static final long REVEAL_MILLIS = 10_000;
     static final String EMPTY = "vault is empty - press [a] to add an entry";
 
     /** Keys from §4 that later steps implement; pressing one says so instead of doing nothing. */
     static final Map<Character, String> NOT_YET = Map.of(
-            'a', "add", 'e', "edit", 'd', "delete", 's', "reveal", 'c', "copy",
-            'u', "copy user", 'n', "notes", 'p', "change password");
+            'a', "add", 'e', "edit", 'd', "delete", 'p', "change password");
 
     static final Comparator<EntrySummary> ORDER = Comparator
             .comparing(EntrySummary::getSite, String.CASE_INSENSITIVE_ORDER)
@@ -51,6 +55,15 @@ public final class VaultScreen implements TuiScreen {
     private final StringBuilder query = new StringBuilder();
     private boolean searching;
     private boolean pendingG;
+
+    // Shown secrets: decrypted on demand, wiped when hidden.
+    private char[] shownPassword;
+    private long passwordUntil;
+    private boolean notesShown;
+    private char[] shownNotes;      // null with notesShown = entry has no notes
+    private long notesUntil;
+    private boolean copyActive;     // show "copied (Ns)" while our clipboard clear is pending
+    private long countdownKey = -1; // last displayed countdown values, to redraw only on change
 
     public VaultScreen(TuiContext ctx) {
         this(ctx, null);
@@ -73,6 +86,7 @@ public final class VaultScreen implements TuiScreen {
     }
 
     private void refilter() {
+        hideSecrets();
         Long keep = current() == null ? null : current().getId();
         String q = query.toString().trim().toLowerCase(Locale.ROOT);
         if (q.isEmpty()) {
@@ -102,7 +116,38 @@ public final class VaultScreen implements TuiScreen {
 
     private void move(int delta) {
         if (view.isEmpty()) return;
-        selected = Math.max(0, Math.min(view.size() - 1, selected + delta));
+        select(selected + delta);
+    }
+
+    private void select(int index) {
+        int next = Math.max(0, Math.min(view.size() - 1, index));
+        if (next != selected) {
+            hideSecrets();  // a revealed value belongs to the old selection
+            selected = next;
+        }
+    }
+
+    private void hidePassword() {
+        if (shownPassword != null) java.util.Arrays.fill(shownPassword, '\0');
+        shownPassword = null;
+    }
+
+    private void hideNotes() {
+        if (shownNotes != null) java.util.Arrays.fill(shownNotes, '\0');
+        shownNotes = null;
+        notesShown = false;
+    }
+
+    private void hideSecrets() {
+        hidePassword();
+        hideNotes();
+    }
+
+    private void lock(String notice) {
+        hideSecrets();
+        ctx.clipboard.clearNow();
+        ctx.connector.lockVault();
+        ctx.show(new UnlockScreen(ctx, notice));
     }
 
     @Override
@@ -152,7 +197,7 @@ public final class VaultScreen implements TuiScreen {
                 refilter();
                 return Action.REDRAW;
             }
-            case Home -> { selected = 0; return Action.REDRAW; }
+            case Home -> { select(0); return Action.REDRAW; }
             case End -> { move(view.size()); return Action.REDRAW; }
             case Character -> { }
             default -> { return Action.REDRAW; }
@@ -164,17 +209,23 @@ public final class VaultScreen implements TuiScreen {
             case 'j' -> move(1);
             case 'k' -> move(-1);
             case 'g' -> {
-                if (afterG) selected = 0;
+                if (afterG) select(0);
                 else pendingG = true;
             }
             case 'G' -> move(view.size());
-            case '/' -> searching = true;
-            case '?' -> ctx.show(new HelpOverlay(ctx, this));
-            case 'l' -> {
-                ctx.connector.lockVault();
-                ctx.show(new UnlockScreen(ctx, "ok: vault locked"));
+            case '/' -> {
+                hideSecrets();
+                searching = true;
             }
+            case 's' -> togglePassword();
+            case 'n' -> toggleNotes();
+            case 'c' -> copyPassword();
+            case 'u' -> copyUser();
+            case '?' -> ctx.show(new HelpOverlay(ctx, this));
+            case 'l' -> lock("ok: vault locked");
             case 'q' -> {
+                hideSecrets();
+                ctx.clipboard.clearNow();
                 ctx.connector.lockVault();
                 return Action.QUIT;
             }
@@ -188,13 +239,107 @@ public final class VaultScreen implements TuiScreen {
         return Action.REDRAW;
     }
 
+    private void togglePassword() {
+        EntrySummary e = current();
+        if (e == null) return;
+        if (shownPassword != null) {
+            hidePassword();
+            return;
+        }
+        try {
+            // The service wipes its copy when the callback returns; ours is wiped on re-mask.
+            shownPassword = ctx.connector.withPassword(e.getId(), char[]::clone);
+            passwordUntil = ctx.now() + REVEAL_MILLIS;
+        } catch (RuntimeException ex) {
+            status.show("err: could not decrypt this entry", ctx.now());
+        }
+    }
+
+    private void toggleNotes() {
+        EntrySummary e = current();
+        if (e == null) return;
+        if (notesShown) {
+            hideNotes();
+            return;
+        }
+        try {
+            shownNotes = ctx.connector.withNotes(e.getId(), n -> n == null ? null : n.clone());
+            notesShown = true;
+            notesUntil = ctx.now() + REVEAL_MILLIS;
+        } catch (RuntimeException ex) {
+            status.show("err: could not decrypt this entry", ctx.now());
+        }
+    }
+
+    private void copyPassword() {
+        EntrySummary e = current();
+        if (e == null) return;
+        if (!ctx.clipboard.available()) {
+            status.show(NO_CLIPBOARD, ctx.now());
+            return;
+        }
+        long now = ctx.now();
+        boolean copied;
+        try {
+            copied = ctx.connector.withPassword(e.getId(), pw -> ctx.clipboard.copySecret(pw, now));
+        } catch (RuntimeException ex) {
+            status.show("err: could not decrypt this entry", now);
+            return;
+        }
+        if (copied) {
+            copyActive = true;
+            status.show("ok: copied", now);
+        } else {
+            status.show("err: copy failed - press [s] to reveal", now);
+        }
+    }
+
+    private void copyUser() {
+        EntrySummary e = current();
+        if (e == null) return;
+        if (!ctx.clipboard.available()) {
+            status.show(NO_CLIPBOARD, ctx.now());
+        } else if (ctx.clipboard.copyPlain(e.getUser())) {
+            copyActive = false;
+            status.show("ok: username copied", ctx.now());
+        } else {
+            status.show("err: copy failed", ctx.now());
+        }
+    }
+
     @Override
     public boolean tick(long now) {
         if (!ctx.connector.isUnlocked()) {  // auto-lock fired in VaultService
-            ctx.show(new UnlockScreen(ctx, "ok: vault auto-locked"));
+            lock("ok: vault auto-locked");
             return true;
         }
-        return status.tick(now);
+        boolean changed = status.tick(now);
+        if (shownPassword != null && now >= passwordUntil) {
+            hidePassword();
+            changed = true;
+        }
+        if (notesShown && now >= notesUntil) {
+            hideNotes();
+            changed = true;
+        }
+        if (copyActive && !ctx.clipboard.hasPendingClear()) {
+            copyActive = false;
+            status.show("ok: clipboard cleared", now);
+            changed = true;
+        }
+        long key = (shownPassword != null ? Draw.secondsLeft(passwordUntil - now) : 0) * 1_000_000
+                + (notesShown ? Draw.secondsLeft(notesUntil - now) : 0) * 1_000
+                + (copyActive ? ctx.clipboard.secondsUntilClear(now) : 0);
+        if (key != countdownKey) {
+            countdownKey = key;
+            changed = true;
+        }
+        return changed;
+    }
+
+    @Override
+    public void onHide() {
+        hideSecrets();  // help overlay, lock, quit: nothing stays revealed
     }
 
     @Override
@@ -223,15 +368,22 @@ public final class VaultScreen implements TuiScreen {
         drawList(g, t, w, listTop);
         drawDetails(g, t, w, detailsTop + 1);
 
-        // Footer: key hints left, status right.
-        g.setForegroundColor(t.dim);
-        g.putString(2, h - 2, FOOTER);
+        // Footer: key hints left, status right; a status too long for the gap takes the whole row.
         String msg = status.text();
+        long now = ctx.now();
+        if (copyActive && ctx.clipboard.hasPendingClear() && (msg == null || msg.startsWith("ok: copied"))) {
+            msg = "ok: copied (" + ctx.clipboard.secondsUntilClear(now) + "s)";
+        }
+        int room = w - 4 - FOOTER.length() - 2;
+        boolean statusOnly = msg != null && msg.length() > room;
+        if (!statusOnly) {
+            g.setForegroundColor(t.dim);
+            g.putString(2, h - 2, FOOTER);
+        }
         if (msg != null) {
-            int room = w - 4 - FOOTER.length() - 2;
-            String shown = Draw.truncate(msg, Math.max(0, room));
+            String shown = Draw.truncate(msg, statusOnly ? w - 4 : room);
             g.setForegroundColor(msg.startsWith("err:") ? t.error : t.success);
-            g.putString(w - 2 - shown.length(), h - 2, shown);
+            g.putString(statusOnly ? 2 : w - 2 - shown.length(), h - 2, shown);
         }
     }
 
@@ -317,14 +469,66 @@ public final class VaultScreen implements TuiScreen {
         g.setForegroundColor(t.text);
         g.putString(valueCol, top, Draw.truncate(e.getSite(), room));
         g.putString(valueCol, top + 1, Draw.truncate(e.getUser(), room));
-        g.putString(valueCol, top + 2, MASK);
-        g.setForegroundColor(t.dim);
-        g.putString(valueCol, top + 3, "(hidden)");
+
+        long now = ctx.now();
+        int hintCol = valueCol + MASK.length() + 4;
+        if (shownPassword != null) {
+            String suffix = "  (hides in " + Draw.secondsLeft(passwordUntil - now) + "s)";
+            g.setForegroundColor(t.primary);
+            int end = putSecret(g, valueCol, top + 2, shownPassword, room - suffix.length());
+            g.setForegroundColor(t.dim);
+            g.putString(end, top + 2, suffix);
+        } else {
+            g.putString(valueCol, top + 2, MASK);
+            g.setForegroundColor(t.dim);
+            g.putString(hintCol, top + 2, PASSWORD_HINTS);
+        }
+
+        if (notesShown) {
+            String suffix = "  (hides in " + Draw.secondsLeft(notesUntil - now) + "s)";
+            int end;
+            if (shownNotes == null || shownNotes.length == 0) {
+                g.setForegroundColor(t.dim);
+                g.putString(valueCol, top + 3, "(none)");
+                end = valueCol + 6;
+            } else {
+                g.setForegroundColor(t.primary);
+                end = putSecret(g, valueCol, top + 3, shownNotes, room - suffix.length());
+            }
+            g.setForegroundColor(t.dim);
+            g.putString(end, top + 3, suffix);
+        } else {
+            g.setForegroundColor(t.dim);
+            g.putString(valueCol, top + 3, "(hidden)");
+            g.putString(hintCol, top + 3, NOTES_HINT);
+        }
+    }
+
+    /**
+     * Draws a secret cell by cell, so no String of the whole value is built here. Control
+     * characters (newlines in notes) show as spaces. Returns the column after the last cell.
+     */
+    private static int putSecret(TextGraphics g, int col, int row, char[] value, int max) {
+        boolean cut = value.length > max;
+        int n = cut ? Math.max(0, max - 3) : value.length;
+        for (int i = 0; i < n; i++) {
+            char c = value[i];
+            g.setCharacter(col + i, row, Character.isISOControl(c) ? ' ' : c);
+        }
+        if (cut) {
+            g.putString(col + n, row, "...");
+            n += 3;
+        }
+        return col + n;
     }
 
     /** Test hooks. */
     EntrySummary selectedEntry() {
         return current();
+    }
+
+    char[] shownPassword() {
+        return shownPassword;
     }
 
     boolean isSearching() {

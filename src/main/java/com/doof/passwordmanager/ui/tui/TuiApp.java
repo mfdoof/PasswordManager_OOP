@@ -3,6 +3,8 @@ package com.doof.passwordmanager.ui.tui;
 import com.doof.passwordmanager.app.AppBootstrap;
 import com.doof.passwordmanager.db.ConnectionManager;
 import com.doof.passwordmanager.service.ApplicationConnector;
+import com.doof.passwordmanager.ui.tui.clip.AwtClipboardBackend;
+import com.doof.passwordmanager.ui.tui.clip.SecureClipboard;
 import com.doof.passwordmanager.ui.tui.screen.CreateScreen;
 import com.doof.passwordmanager.ui.tui.screen.UnlockScreen;
 import com.googlecode.lanterna.input.KeyStroke;
@@ -41,6 +43,8 @@ public final class TuiApp {
             com.doof.passwordmanager.app.Main.main(args);
             return;
         }
+        // The clipboard uses AWT; on macOS this keeps it from adding a Dock icon for a terminal app.
+        System.setProperty("apple.awt.UIElement", "true");
 
         // Open the vault before taking over the terminal, so errors print normally.
         List<String> warnings = new ArrayList<>();
@@ -59,7 +63,8 @@ public final class TuiApp {
             return t;
         });
         TuiContext ctx = new TuiContext(connector, displayPath(cm.getVaultPath(), System.getProperty("user.home")),
-                warnings, worker, System::currentTimeMillis, java.time.ZoneId.systemDefault());
+                warnings, worker, System::currentTimeMillis, java.time.ZoneId.systemDefault(),
+                new SecureClipboard(() -> AwtClipboardBackend.probe(System.getenv())));
 
         Theme theme = Theme.detect(options, System.getenv());
         Charset charset = theme.unicode() ? StandardCharsets.UTF_8 : Charset.defaultCharset();
@@ -75,7 +80,8 @@ public final class TuiApp {
             System.err.println("Run it in an interactive terminal (local or over SSH).");
             exit = 1;
         } finally {
-            connector.lockVault();  // wipe keys on every exit path
+            ctx.clipboard.clearNow();  // don't leave a copied password behind
+            connector.lockVault();     // wipe keys on every exit path
             worker.shutdownNow();
         }
         System.exit(exit);
@@ -100,6 +106,9 @@ public final class TuiApp {
                 KeyStroke key = screen.pollInput();
                 if (key != null) {
                     manager.handleKey(key);
+                }
+                if (ctx.clipboard.tick(ctx.now())) {
+                    manager.markDirty();
                 }
                 manager.tick(ctx.now());
                 if (manager.isQuitRequested()) {

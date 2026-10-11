@@ -50,11 +50,11 @@ After the *n*-th consecutive wrong password, the next attempt must wait `min(1s 
 
 ## Runtime behavior
 
-- **Decrypt on demand:** after unlock only site + username are kept in memory for listing and search. A password is decrypted only when revealed or copied, into a `char[]` that is wiped as soon as it has been used. Notes are decrypted only when requested.
+- **Decrypt on demand:** after unlock only site + username are kept in memory for listing and search. A password or the notes are decrypted only when revealed or copied, into a `char[]` that is wiped as soon as it has been used (for a reveal: when it re-masks). Moving the selection, searching, opening help, locking, auto-lock and quitting all re-mask immediately.
 - **Wiping:** secrets live in `char[]`/`byte[]` and are zeroed after use; the encryption key is zeroed on lock.
 - **Auto-lock:** the session locks 5 minutes after unlock and the key is wiped. The current Swing UI does not extend this on activity, and the dashboard window stays open but every action is refused until you unlock again. The Phase 2 TUI adds idle-based reset and returns to the unlock screen.
-- **Clipboard:** copying uses the Java AWT clipboard and clears it after 20 seconds. There is no OSC 52 support, so copying does not work over SSH or headless; reveal works everywhere. Other apps can read the clipboard while it holds the password.
-- **Reveal:** a revealed password re-masks after 10 seconds.
+- **Clipboard:** copying uses the Java AWT clipboard. A copied password is cleared after 20 seconds, and also on lock and on quit, but only if the clipboard still holds it (checked by SHA-256, so the app does not keep the value). A copied username is not cleared. Over SSH without X forwarding, or headless, the clipboard is reported as unavailable instead of silently copying to the remote machine's clipboard; there is no OSC 52 support. Reveal works everywhere. Other apps can read the clipboard while it holds the password.
+- **Reveal:** `s` shows the password and `n` the notes in the details pane for 10 seconds with a countdown, then re-masks. Characters are drawn cell by cell, so the app never builds a `String` of the value for display.
 - **Master password rotation:** verifies the old password, generates a new salt and keys using the current default Argon2id parameters (so rotation also upgrades old parameters), and re-encrypts every entry and replaces the metadata in **one** SQLite transaction. Any failure rolls back everything; the vault still opens with the old password.
 
 ## File security
@@ -67,6 +67,8 @@ After the *n*-th consecutive wrong password, the next attempt must wait `min(1s 
 ## Known limitations
 
 - **JVM key copies.** The JCA (`SecretKeySpec`, cipher state) copies key bytes internally. The app wipes its own arrays but cannot zero those copies; they remain until garbage-collected.
-- **Swing `String`s (until Phase 2).** Swing labels and the AWT clipboard require `java.lang.String`, which is immutable and cannot be wiped. A revealed or copied password therefore lingers in memory until garbage collection. The Phase 2 TUI replaces Swing.
+- **Clipboard `String`s.** The AWT clipboard API only accepts a `java.lang.String`, which is immutable and cannot be wiped. Copying a password therefore leaves one copy in JVM memory until garbage collection, and reading the clipboard back for the clear-if-unchanged check makes another. The operating system's clipboard also holds the value until it is cleared.
+- **Terminal display.** A revealed value is drawn into Lanterna's screen buffers (one object per cell) and sent to the terminal emulator, which keeps its own copy of the screen. The app overwrites the cells on re-mask but cannot wipe the emulator's memory or a session recording.
+- **Swing `String`s (until Phase 2 step 7).** The old Swing UI, still reachable with `--swing`, puts revealed passwords into `String`s for its labels. It is removed at the end of Phase 2.
 - **Session timeout is fixed, not idle-based** in the Swing UI (see Auto-lock).
 - **Write access to the file.** Someone who can modify `vault.db` can reset the failure counter or corrupt data (denial of service). That gains them nothing beyond what an offline attack on a copy already allows; changing `kdf_params` or the salt just makes unlock fail.

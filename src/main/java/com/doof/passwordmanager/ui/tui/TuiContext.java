@@ -1,6 +1,7 @@
 package com.doof.passwordmanager.ui.tui;
 
 import com.doof.passwordmanager.service.ApplicationConnector;
+import com.doof.passwordmanager.ui.tui.clip.SecureClipboard;
 
 import java.time.ZoneId;
 import java.util.List;
@@ -21,16 +22,19 @@ public final class TuiContext {
     public final LongSupplier clock;
     /** Time zone for displayed dates. */
     public final ZoneId zone;
+    /** Copy with auto-clear; ticked by the main loop, cleared on lock and quit. */
+    public final SecureClipboard clipboard;
     private ScreenManager manager;
 
     public TuiContext(ApplicationConnector connector, String vaultPath, List<String> warnings,
-                      Executor worker, LongSupplier clock, ZoneId zone) {
+                      Executor worker, LongSupplier clock, ZoneId zone, SecureClipboard clipboard) {
         this.connector = Objects.requireNonNull(connector);
         this.vaultPath = Objects.requireNonNull(vaultPath);
         this.warnings = List.copyOf(warnings);
         this.worker = Objects.requireNonNull(worker);
         this.clock = Objects.requireNonNull(clock);
         this.zone = Objects.requireNonNull(zone);
+        this.clipboard = Objects.requireNonNull(clipboard);
     }
 
     void attach(ScreenManager manager) {
