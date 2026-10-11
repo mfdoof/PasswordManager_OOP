@@ -147,7 +147,7 @@ public class EntryService {
 
             InputValidator.validateUsername(user);
             InputValidator.validateWebsite(site);
-            InputValidator.validatePassword(password);
+            InputValidator.validateEntryPassword(password);
 
             checkUnlocked();
             checkDuplicate(site, user, null);
@@ -189,7 +189,7 @@ public class EntryService {
             }
 
             if (newPassword != null && newPassword.length > 0) {
-                InputValidator.validatePassword(newPassword);
+                InputValidator.validateEntryPassword(newPassword);
                 password = newPassword.clone();
             } else {
                 password = decrypt(existing, EntryCodec::decodePassword);

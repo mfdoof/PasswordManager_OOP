@@ -14,6 +14,17 @@ class InputValidatorTest {
     }
 
     @Test
+    void entryPasswordsOnlyNeedToBeNonEmptyWithoutControlChars() {
+        for (String ok : new String[]{"1234", "abc", "correct horse battery staple", "P@ss"}) {
+            assertDoesNotThrow(() -> InputValidator.validateEntryPassword(ok.toCharArray()), ok);
+        }
+        assertThrows(ValidationException.class, () -> InputValidator.validateEntryPassword(new char[0]));
+        assertThrows(ValidationException.class, () -> InputValidator.validateEntryPassword("a\nb".toCharArray()));
+        assertThrows(ValidationException.class,
+                () -> InputValidator.validateEntryPassword(new char[PasswordPolicy.MAX_LENGTH + 1]));
+    }
+
+    @Test
     void emptyLongOrControlCharUsernamesAreRejected() {
         String tooLong = "x".repeat(InputValidator.MAX_USERNAME_LENGTH + 1);
         for (String bad : new String[]{null, "", "   ", tooLong, "user\nname", "tab\tbed"}) {

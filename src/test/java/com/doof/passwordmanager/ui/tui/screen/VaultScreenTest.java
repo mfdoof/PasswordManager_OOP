@@ -58,7 +58,7 @@ class VaultScreenTest {
         String s = h.text();
         assertTrue(line(0).contains(" doof vault ") && line(0).contains("[UNLOCKED]"), line(0));
         assertTrue(s.contains("SITE") && s.contains("USERNAME") && s.contains("UPDATED"));
-        assertTrue(s.contains("[/]search [s]reveal [c]opy [l]ock [?]help [q]uit"));
+        assertTrue(s.contains("[a]dd [e]dit [d]el [/]search [l]ock [?]help [q]uit"));
         assertTrue(s.contains("1 entry"));
         assertTrue(s.contains(" details "));
     }
@@ -249,10 +249,10 @@ class VaultScreenTest {
     @Test
     void notYetBuiltKeysShowAnErrorUntilTheNextKey() {
         open();
-        h.type("a");
-        assertTrue(h.text().contains("err: [a] add is not available yet"), h.text());
+        h.type("p");
+        assertTrue(h.text().contains("err: [p] change password is not available yet"), h.text());
         h.advance(60_000);
-        assertTrue(h.text().contains("err: [a] add is not available yet"), "errors do not time out");
+        assertTrue(h.text().contains("err: [p] change password is not available yet"), "errors do not time out");
         h.type("j");
         assertFalse(h.text().contains("err:"));
     }

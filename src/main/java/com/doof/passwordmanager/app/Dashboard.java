@@ -170,7 +170,7 @@ public class Dashboard {
             try {
                 InputValidator.validateUsername(email);
                 InputValidator.validateWebsite(website);
-                InputValidator.validatePassword(pwd);
+                InputValidator.validateEntryPassword(pwd);
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(frame, ex.getMessage(), "Validation", JOptionPane.WARNING_MESSAGE);
                 Arrays.fill(pwd, '\0');
@@ -230,7 +230,7 @@ public class Dashboard {
             try {
                 InputValidator.validateUsername(email);
                 InputValidator.validateWebsite(website);
-                if (pwd != null && pwd.length > 0) InputValidator.validatePassword(pwd);
+                if (pwd != null && pwd.length > 0) InputValidator.validateEntryPassword(pwd);
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(frame, ex.getMessage(), "Validation", JOptionPane.WARNING_MESSAGE);
                 Arrays.fill(pwd, '\0');

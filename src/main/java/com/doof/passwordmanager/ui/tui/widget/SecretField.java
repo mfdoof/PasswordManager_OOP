@@ -61,6 +61,18 @@ public final class SecretField {
         len = 0;
     }
 
+    /** Replaces the contents with {@code value} (not kept); the old buffer is wiped. */
+    public void set(char[] value) {
+        clear();
+        for (char c : value) append(c);
+    }
+
+    /** Character at {@code index} (for cell-by-cell drawing without building a String). */
+    public char charAt(int index) {
+        if (index < 0 || index >= len) throw new IndexOutOfBoundsException(index);
+        return buf[index];
+    }
+
     /** Masked rendering: one '*' per character, showing only the last {@code maxWidth} positions. */
     public String masked(int maxWidth) {
         int n = Math.min(len, Math.max(0, maxWidth));

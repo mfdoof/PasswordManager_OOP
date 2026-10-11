@@ -20,7 +20,7 @@ public final class HelpOverlay implements TuiScreen {
             new KeyHelp("j / k, arrows", "move selection", true),
             new KeyHelp("g g / G", "first / last entry", true),
             new KeyHelp("/", "search; ESC clears it", true),
-            new KeyHelp("a / e / d", "add / edit / delete", false),
+            new KeyHelp("a / e / d", "add / edit / delete", true),
             new KeyHelp("s", "reveal password 10s", true),
             new KeyHelp("c", "copy password (20s clear)", true),
             new KeyHelp("u", "copy username", true),
@@ -29,9 +29,9 @@ public final class HelpOverlay implements TuiScreen {
             new KeyHelp("l", "lock now", true),
             new KeyHelp("?", "this help", true),
             new KeyHelp("q", "quit (clears screen, wipes keys)", true),
-            new KeyHelp("TAB / shift+TAB", "next / previous field", false),
-            new KeyHelp("g", "generate password (entry form)", false),
-            new KeyHelp("v", "toggle password visibility", false),
+            new KeyHelp("TAB / shift+TAB", "next / previous field", true),
+            new KeyHelp("g / ctrl+g", "generate password (entry form)", true),
+            new KeyHelp("v / ctrl+v", "show / hide password (entry form)", true),
             new KeyHelp("ENTER / ESC", "confirm / cancel", true));
 
     static final String SOON = "(soon)";

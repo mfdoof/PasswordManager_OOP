@@ -28,7 +28,7 @@ public final class VaultScreen implements TuiScreen {
     static final String TITLE = "doof vault";
     static final String STATE = "[UNLOCKED]";
     static final String MASK = "************";  // fixed length: does not reveal the password length
-    static final String FOOTER = "[/]search [s]reveal [c]opy [l]ock [?]help [q]uit";
+    static final String FOOTER = "[a]dd [e]dit [d]el [/]search [l]ock [?]help [q]uit";
     static final String PASSWORD_HINTS = "[s] reveal  [c] copy  [u] copy user";
     static final String NOTES_HINT = "[n] show notes";
     static final String NO_CLIPBOARD = "err: clipboard unavailable - press [s] to reveal";
@@ -36,8 +36,7 @@ public final class VaultScreen implements TuiScreen {
     static final String EMPTY = "vault is empty - press [a] to add an entry";
 
     /** Keys from §4 that later steps implement; pressing one says so instead of doing nothing. */
-    static final Map<Character, String> NOT_YET = Map.of(
-            'a', "add", 'e', "edit", 'd', "delete", 'p', "change password");
+    static final Map<Character, String> NOT_YET = Map.of('p', "change password");
 
     static final Comparator<EntrySummary> ORDER = Comparator
             .comparing(EntrySummary::getSite, String.CASE_INSENSITIVE_ORDER)
@@ -64,6 +63,7 @@ public final class VaultScreen implements TuiScreen {
     private long notesUntil;
     private boolean copyActive;     // show "copied (Ns)" while our clipboard clear is pending
     private long countdownKey = -1; // last displayed countdown values, to redraw only on change
+    private EntrySummary pendingDelete; // waiting for [y/N]
 
     public VaultScreen(TuiContext ctx) {
         this(ctx, null);
@@ -150,9 +150,54 @@ public final class VaultScreen implements TuiScreen {
         ctx.show(new UnlockScreen(ctx, notice));
     }
 
+    /** Called by the entry form after a save: refresh, select the entry (clearing a filter that hides it). */
+    void afterChange(long id, String message) {
+        reload();
+        if (!selectById(id) && query.length() > 0) {
+            query.setLength(0);
+            searching = false;
+            refilter();
+            selectById(id);
+        }
+        status.show(message, ctx.now());
+    }
+
+    private boolean selectById(long id) {
+        for (int i = 0; i < view.size(); i++) {
+            if (view.get(i).getId() == id) {
+                hideSecrets();
+                selected = i;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void confirmDelete(KeyStroke key) {
+        EntrySummary target = pendingDelete;
+        pendingDelete = null;
+        boolean yes = key.getKeyType() == KeyType.Character && !key.isCtrlDown()
+                && Character.toLowerCase(key.getCharacter()) == 'y';
+        if (!yes) return;  // default No: any other key cancels
+        int index = selected;
+        try {
+            ctx.connector.deleteEntry(target.getId());
+        } catch (RuntimeException ex) {
+            status.show("err: could not delete: " + ex.getMessage(), ctx.now());
+            return;
+        }
+        reload();
+        selected = Math.max(0, Math.min(index, view.size() - 1));  // the neighbour takes its place
+        status.show("ok: deleted " + target.getSite(), ctx.now());
+    }
+
     @Override
     public Action handleKey(KeyStroke key) {
         status.onKey();
+        if (pendingDelete != null) {
+            confirmDelete(key);
+            return Action.REDRAW;
+        }
         boolean afterG = pendingG;
         pendingG = false;
         KeyType type = key.getKeyType();
@@ -216,6 +261,17 @@ public final class VaultScreen implements TuiScreen {
             case '/' -> {
                 hideSecrets();
                 searching = true;
+            }
+            case 'a' -> ctx.show(new EntryModal(ctx, this));
+            case 'e' -> {
+                if (current() != null) ctx.show(new EntryModal(ctx, this, current()));
+            }
+            case 'd' -> {
+                EntrySummary e = current();
+                if (e != null) {
+                    pendingDelete = e;
+                    status.show("err: delete " + e.getSite() + " (" + e.getUser() + ")? [y/N]", ctx.now());
+                }
             }
             case 's' -> togglePassword();
             case 'n' -> toggleNotes();

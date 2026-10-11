@@ -2,12 +2,8 @@ package com.doof.passwordmanager.util;
 
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.regex.Pattern;
 
 public final class InputValidator {
-
-    private static final Pattern PASSWORD_PATTERN =
-            Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,}$");
 
     private InputValidator() {}
 
@@ -26,15 +22,23 @@ public final class InputValidator {
         }
     }
 
-    public static void validatePassword(char[] password) {
+    /**
+     * Rule for passwords stored in entries: whatever the site requires, so only non-empty,
+     * at most {@link PasswordPolicy#MAX_LENGTH} chars and no control characters. Strength is
+     * shown as guidance, not enforced. (The master password has its own policy.)
+     */
+    public static void validateEntryPassword(char[] password) {
         if (password == null || password.length == 0) {
             throw new ValidationException("Password cannot be empty.");
         }
-        String pass = new String(password);
-        if (!PASSWORD_PATTERN.matcher(pass).matches()) {
-            throw new ValidationException("Password must be at least 8 characters long, with uppercase, lowercase, and a number.");
+        if (password.length > PasswordPolicy.MAX_LENGTH) {
+            throw new ValidationException("Password is too long (max " + PasswordPolicy.MAX_LENGTH + " characters).");
         }
-        pass = null;
+        for (char c : password) {
+            if (Character.isISOControl(c)) {
+                throw new ValidationException("Password cannot contain control characters.");
+            }
+        }
     }
 
     public static void validateWebsite(String website) {

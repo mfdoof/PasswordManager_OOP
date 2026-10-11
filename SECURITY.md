@@ -68,6 +68,8 @@ After the *n*-th consecutive wrong password, the next attempt must wait `min(1s 
 
 - **JVM key copies.** The JCA (`SecretKeySpec`, cipher state) copies key bytes internally. The app wipes its own arrays but cannot zero those copies; they remain until garbage-collected.
 - **Clipboard `String`s.** The AWT clipboard API only accepts a `java.lang.String`, which is immutable and cannot be wiped. Copying a password therefore leaves one copy in JVM memory until garbage collection, and reading the clipboard back for the clear-if-unchanged check makes another. The operating system's clipboard also holds the value until it is cleared.
+- **Notes on save.** The entry form keeps notes in a `char[]`, but the service API takes them as a `String` when saving, so one unwipeable copy exists until garbage collection. Passwords stay `char[]` all the way to encryption.
+- **Entry passwords are not policy-checked.** Stored passwords only have to be non-empty (sites have their own rules, some need PINs). The form shows a strength bar and has a generator (SecureRandom, 20 characters by default, at least one character from each enabled set); the strict policy applies to the master password only.
 - **Terminal display.** A revealed value is drawn into Lanterna's screen buffers (one object per cell) and sent to the terminal emulator, which keeps its own copy of the screen. The app overwrites the cells on re-mask but cannot wipe the emulator's memory or a session recording.
 - **Swing `String`s (until Phase 2 step 7).** The old Swing UI, still reachable with `--swing`, puts revealed passwords into `String`s for its labels. It is removed at the end of Phase 2.
 - **Session timeout is fixed, not idle-based** in the Swing UI (see Auto-lock).
