@@ -2,21 +2,22 @@ package com.doof.passwordmanager.service;
 
 import com.doof.passwordmanager.dao.EntryDao;
 import com.doof.passwordmanager.dao.VaultMetadataDao;
-import com.doof.passwordmanager.service.AccountService.AccountView;
+import com.doof.passwordmanager.service.EntryService.EntrySummary;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 
 public class ApplicationConnector {
 
     private final VaultService vaultService;
-    private final AccountService accountService;
+    private final EntryService entryService;
 
     public ApplicationConnector(VaultMetadataDao vaultMetadataDao, EntryDao entryDao) {
         Objects.requireNonNull(vaultMetadataDao);
         Objects.requireNonNull(entryDao);
         this.vaultService = new VaultService(vaultMetadataDao);
-        this.accountService = new AccountService(entryDao, vaultService);
+        this.entryService = new EntryService(entryDao, vaultService);
     }
 
 
@@ -30,6 +31,7 @@ public class ApplicationConnector {
 
     public void unlockVault(char[] masterPassword) {
         vaultService.unlockVault(masterPassword);
+        entryService.loadIndex();
     }
 
     public void lockVault() {
@@ -47,27 +49,37 @@ public class ApplicationConnector {
     }
 
 
-    public List<AccountView> getAllAccountsDecrypted() {
-        return accountService.getAllAccountsDecrypted();
+    /** Site + user of every entry; no passwords. */
+    public List<EntrySummary> listEntries() {
+        return entryService.listEntries();
     }
 
-    public AccountView getAccountByIdDecrypted(long id) {
-        return accountService.getAccountByIdDecrypted(id);
+    public EntrySummary getEntry(long id) {
+        return entryService.getEntry(id);
     }
 
-    public long addAccount(String email, String website, char[] plaintextPassword) {
-        return accountService.addAccount(email, website, plaintextPassword);
+    public List<EntrySummary> search(String query, int limit, int offset) {
+        return entryService.search(query, limit, offset);
     }
 
-    public void updateAccount(long id, String email, String website, char[] plaintextPassword) {
-        accountService.updateAccount(id, email, website, plaintextPassword);
+    /** Decrypts the password on demand; it is wiped as soon as {@code use} returns. */
+    public <T> T withPassword(long id, Function<char[], T> use) {
+        return entryService.withPassword(id, use);
     }
 
-    public void deleteAccount(long id) {
-        accountService.deleteAccount(id);
+    public String revealNotes(long id) {
+        return entryService.revealNotes(id);
     }
 
-    public List<AccountView> search(String query, int limit, int offset) {
-        return accountService.search(query, limit, offset);
+    public long addEntry(String site, String user, char[] password, String notes) {
+        return entryService.addEntry(site, user, password, notes);
+    }
+
+    public void updateEntry(long id, String site, String user, char[] newPassword, String notes) {
+        entryService.updateEntry(id, site, user, newPassword, notes);
+    }
+
+    public void deleteEntry(long id) {
+        entryService.deleteEntry(id);
     }
 }

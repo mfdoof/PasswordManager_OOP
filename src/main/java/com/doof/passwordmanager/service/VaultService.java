@@ -8,6 +8,8 @@ import com.doof.passwordmanager.dao.VaultMetadataDao;
 import com.doof.passwordmanager.model.VaultMetadata;
 
 import java.security.MessageDigest;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -35,6 +37,7 @@ class VaultService {
         return t;
     });
     private ScheduledFuture<?> autoLockTask;
+    private final List<Runnable> lockListeners = new CopyOnWriteArrayList<>();
 
     VaultService(VaultMetadataDao metadataDao) {
         this(metadataDao, KdfParams.DEFAULT);
@@ -119,6 +122,15 @@ class VaultService {
             cachedMetadata = null;
         }
         cancelAutoLockTimer();
+        // Outside keyLock so listeners may take their own locks without lock-order issues.
+        for (Runnable listener : lockListeners) {
+            listener.run();
+        }
+    }
+
+    /** Runs {@code listener} after every lock, including auto-lock (on the timer thread). */
+    void addLockListener(Runnable listener) {
+        lockListeners.add(listener);
     }
 
     boolean isUnlocked() {
