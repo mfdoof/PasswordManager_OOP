@@ -128,4 +128,5 @@ Summary: Lanterna, keyboard-only, min 80x24, content capped at 120 columns and c
 ## 11. Roadmap
 - **Phase 1 – Hardening (done):** Maven → SQLite → crypto → encrypted fields → on-demand decrypt → throttling → rotation → SECURITY.md/README.
 - **Phase 2 – TUI (done):** Lanterna UI per §9 / `TUI_DESIGN.md`, idle auto-lock, clipboard auto-clear, generator, change master password; Swing and the console harness removed.
-- **Phase 3 – Deployment:** homelab deploy, encrypted backups, file-ownership hardening.
+- **Phase 3a – Local deployment (in progress):** GitHub Actions CI (ubuntu + macos); `doof backup` (SQLite online backup of the encrypted file, `600` perms, timestamped, pruned, no master password needed); tag-triggered releases with the jar and `SHA256SUMS`; `bin/doof` wrapper + `install.sh` (checksum-verified download, Java 17+ check, `~/.local`, idempotent, `--uninstall`); example launchd/systemd jobs for nightly backups. Decisions: wrapper script instead of jpackage, install script instead of Homebrew, checksums now and signing later.
+- **Phase 3b – Later:** cosign-signed releases, homelab/server deployment, file-ownership hardening.
