@@ -27,3 +27,18 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+### Maven ###
+target/
+
+### IntelliJ IDEA (project files are not tracked) ###
+.idea/
+*.iml
+
+### Local vault data ###
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+CLAUDE.md
+HANDOFF.md
