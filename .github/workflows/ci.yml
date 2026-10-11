@@ -46,3 +46,49 @@ jobs:
           path: target/doof-vault.jar
           retention-days: 7
           if-no-files-found: error
+
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: ShellCheck bin/doof and install.sh
+        run: |
+          shellcheck --version
+          shellcheck bin/doof install.sh
+
+      - name: Launcher embedded in install.sh matches bin/doof
+        run: diff <(awk "/<<'DOOF_WRAPPER'\$/{f=1;next} /^DOOF_WRAPPER\$/{f=0} f" install.sh) bin/doof
+
+  install:
+    name: install.sh (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Set up Java 17
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6  # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install the latest release into a temporary HOME, run it, uninstall
+        run: |
+          set -euo pipefail
+          home="$(mktemp -d)"
+          HOME="$home" bash install.sh
+          HOME="$home" bash install.sh | grep -q "already installed and verified"
+          HOME="$home" "$home/.local/bin/doof" backup --help | grep -q "usage: doof-vault backup"
+          mkdir -p "$home/.doof" && echo keep > "$home/.doof/vault.db"
+          HOME="$home" bash install.sh --uninstall
+          test ! -e "$home/.local/bin/doof" && test ! -e "$home/.local/share/doof"
+          test -f "$home/.doof/vault.db"
