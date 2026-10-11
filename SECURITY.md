@@ -64,6 +64,10 @@ After the *n*-th consecutive wrong password, the next attempt must wait `min(1s 
 - On every open (POSIX systems): a warning if the file or its directory is accessible by group or others.
 - `PRAGMA secure_delete = ON` overwrites deleted data inside the database file.
 
+## Backups
+
+`doof-vault backup` copies the encrypted file (no keys, no master password) and verifies it before pruning older copies. Backups are created `600` in a `700` directory. A backup opens with the master password that was current when it was taken: after changing the master password, older backups still open with the old one, so keep or delete them with that in mind. Treat backups like the vault file itself: anyone who copies one can attempt offline guessing (see [Throttling](#throttling)).
+
 ## Known limitations
 
 - **JVM key copies.** The JCA (`SecretKeySpec`, cipher state) copies key bytes internally. The app wipes its own arrays but cannot zero those copies; they remain until garbage-collected.

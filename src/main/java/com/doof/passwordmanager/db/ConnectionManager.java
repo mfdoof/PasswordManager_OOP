@@ -4,18 +4,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.EnumSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -32,11 +29,6 @@ public final class ConnectionManager {
     public static final int SCHEMA_VERSION = 2;
 
     private static final String SCHEMA_RESOURCE = "/db/schema.sql";
-    private static final Set<PosixFilePermission> DIR_PERMS = PosixFilePermissions.fromString("rwx------");
-    private static final Set<PosixFilePermission> FILE_PERMS = PosixFilePermissions.fromString("rw-------");
-    private static final Set<PosixFilePermission> GROUP_OTHER = EnumSet.of(
-            PosixFilePermission.GROUP_READ, PosixFilePermission.GROUP_WRITE, PosixFilePermission.GROUP_EXECUTE,
-            PosixFilePermission.OTHERS_READ, PosixFilePermission.OTHERS_WRITE, PosixFilePermission.OTHERS_EXECUTE);
 
     private final Path vaultPath;
     private final String url;
@@ -77,7 +69,8 @@ public final class ConnectionManager {
         return resolveVaultPath(args, System.getenv(), System.getProperty("user.home"));
     }
 
-    static Path resolveVaultPath(String[] args, Map<String, String> env, String userHome) {
+    /** Same as {@link #resolveVaultPath(String[])} with explicit environment and home (CLI, tests). */
+    public static Path resolveVaultPath(String[] args, Map<String, String> env, String userHome) {
         if (args != null) {
             for (int i = 0; i < args.length; i++) {
                 if (VAULT_ARG.equals(args[i])) {
@@ -120,30 +113,11 @@ public final class ConnectionManager {
     }
 
     private static void prepareFile(Path path, Consumer<String> warn) throws IOException {
-        boolean posix = FileSystems.getDefault().supportedFileAttributeViews().contains("posix");
-        Path dir = path.getParent();
-
-        if (!Files.exists(dir)) {
-            Files.createDirectories(dir);
-            if (posix) Files.setPosixFilePermissions(dir, DIR_PERMS);
-        } else if (posix) {
-            warnIfLoose(dir, "Vault directory", "700", warn);
-        }
-
+        PrivateFiles.ensureDirectory(path.getParent(), "Vault directory", warn);
         if (!Files.exists(path)) {
-            // Create the file ourselves so SQLite never creates it with umask-default permissions.
-            Files.createFile(path);
-            if (posix) Files.setPosixFilePermissions(path, FILE_PERMS);
-        } else if (posix) {
-            warnIfLoose(path, "Vault file", "600", warn);
-        }
-    }
-
-    private static void warnIfLoose(Path p, String what, String expected, Consumer<String> warn) throws IOException {
-        Set<PosixFilePermission> perms = Files.getPosixFilePermissions(p);
-        if (perms.stream().anyMatch(GROUP_OTHER::contains)) {
-            warn.accept(String.format("%s %s has permissions %s; group/other can access it. Run: chmod %s %s",
-                    what, p, PosixFilePermissions.toString(perms), expected, p));
+            PrivateFiles.createFile(path);
+        } else {
+            PrivateFiles.warnIfLoose(path, "Vault file", "600", warn);
         }
     }
 

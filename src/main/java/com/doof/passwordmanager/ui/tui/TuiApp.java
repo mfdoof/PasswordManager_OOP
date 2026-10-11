@@ -1,6 +1,7 @@
 package com.doof.passwordmanager.ui.tui;
 
 import com.doof.passwordmanager.app.AppBootstrap;
+import com.doof.passwordmanager.backup.BackupCommand;
 import com.doof.passwordmanager.db.ConnectionManager;
 import com.doof.passwordmanager.service.ApplicationConnector;
 import com.doof.passwordmanager.ui.tui.clip.AwtClipboardBackend;
@@ -30,6 +31,11 @@ public final class TuiApp {
     private TuiApp() {}
 
     public static void main(String[] args) {
+        if (args.length > 0 && args[0].equals("backup")) {  // non-interactive subcommand, no terminal UI
+            System.exit(BackupCommand.run(java.util.Arrays.copyOfRange(args, 1, args.length), System.getenv(),
+                    System.getProperty("user.home"), java.time.Clock.systemDefaultZone(), System.out, System.err));
+            return;
+        }
         TuiOptions options;
         try {
             options = TuiOptions.parse(args);
