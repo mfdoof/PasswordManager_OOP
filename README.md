@@ -1,5 +1,7 @@
 # DOOF Vault
 
+[![CI](https://github.com/mfdoof/PasswordManager_OOP/actions/workflows/ci.yml/badge.svg)](https://github.com/mfdoof/PasswordManager_OOP/actions/workflows/ci.yml)
+
 A local, single-user password manager for the terminal. The whole vault is one encrypted SQLite file, protected by a master password with Argon2id, HKDF and AES-256-GCM. It is keyboard-only and works locally, over SSH and on a headless console.
 
 It started as a university OOP project (Java + Swing + MySQL) and was rebuilt with a security-first design and a terminal UI.
