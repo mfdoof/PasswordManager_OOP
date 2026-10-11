@@ -32,6 +32,37 @@ Each choice answers a specific threat: a stolen vault file, guessing, tampering,
 - Maven 3.9+ (to build)
 - A terminal of at least 80x24
 
+## Install (macOS and Linux)
+
+Needs Java 17 or newer (for example [Temurin](https://adoptium.net); macOS: `brew install --cask temurin`).
+
+Quick install of the latest release:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mfdoof/PasswordManager_OOP/main/install-doof-vault.sh | bash
+```
+
+Safer: download the script, read it, then run it:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/mfdoof/PasswordManager_OOP/main/install-doof-vault.sh
+less install-doof-vault.sh
+bash install-doof-vault.sh                    # latest release
+bash install-doof-vault.sh --version 2.0.0    # or a specific one
+```
+
+The script downloads `doof-vault-<version>.jar` and `SHA256SUMS` from this repository's GitHub Releases over HTTPS only, verifies the checksum (and installs nothing if it does not match), checks for Java 17+, then installs:
+
+- `~/.local/share/doof/doof-vault.jar` (and a `VERSION` file)
+- `~/.local/bin/doofv`, a small launcher that finds Java 17+ (`$JAVA_HOME`, then `PATH`) and runs the jar
+
+If `~/.local/bin` is not on your `PATH`, it tells you the line to add. Then run `doofv` (or `doofv backup`).
+
+- **Upgrade:** run the script again; it installs the latest release, or does nothing if that version is already installed and intact.
+- **Uninstall:** `bash install-doof-vault.sh --uninstall` (or `curl -fsSL .../install-doof-vault.sh | bash -s -- --uninstall`). It removes only the launcher and the jar; your vault and backups in `~/.doof` are kept.
+
+Installer exit codes: 0 ok, 1 failed (nothing installed or changed), 2 usage error.
+
 ## Releases
 
 Each release on the [Releases page](https://github.com/mfdoof/PasswordManager_OOP/releases) has the runnable jar `doof-vault-<version>.jar` and a `SHA256SUMS` file. They are built and tested by GitHub Actions from the tagged commit on `main`.
@@ -52,7 +83,7 @@ java -jar doof-vault-$VERSION.jar
 
 The check must print `doof-vault-<version>.jar: OK`; if it says `FAILED`, delete the jar and do not run it. Checksums catch corrupted or swapped downloads, but they come from the same release page, so they do not prove who published it; signed releases (cosign) are planned.
 
-## Build and run
+## Build from source
 
 ```bash
 mvn package                     # runs the tests, builds target/doof-vault.jar
@@ -77,7 +108,8 @@ The order of precedence is `--vault`, then `DOOF_VAULT_PATH`, then `~/.doof/vaul
 ## Backup
 
 ```bash
-java -jar target/doof-vault.jar backup [--vault <path>] [--out <dir>] [--keep N]
+doofv backup [--vault <path>] [--out <dir>] [--keep N]
+# without the installer: java -jar doof-vault-<version>.jar backup ...
 ```
 
 Copies the encrypted vault file with SQLite's online backup API (safe while the app is open), verifies the copy (integrity check, schema version, vault set up), saves it as `vault-YYYYMMDD-HHMMSS.db` with `600` permissions in `~/.doof/backups` (`700`), then keeps the newest 14 (`--keep`). It never asks for the master password; a backup is exactly as encrypted as the vault. Output is plain text for cron/launchd/systemd.
