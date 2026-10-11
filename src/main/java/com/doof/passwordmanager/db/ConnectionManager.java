@@ -29,7 +29,7 @@ public final class ConnectionManager {
 
     public static final String VAULT_ARG = "--vault";
     public static final String VAULT_ENV = "DOOF_VAULT_PATH";
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
 
     private static final String SCHEMA_RESOURCE = "/db/schema.sql";
     private static final Set<PosixFilePermission> DIR_PERMS = PosixFilePermissions.fromString("rwx------");

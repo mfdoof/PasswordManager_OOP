@@ -1,12 +1,14 @@
 package com.doof.passwordmanager.service;
 
+import com.doof.passwordmanager.crypto.AesGcm;
+import com.doof.passwordmanager.crypto.SecureWipe;
 import com.doof.passwordmanager.dao.EntryDao;
 import com.doof.passwordmanager.model.Entry;
 import com.doof.passwordmanager.util.InputValidator;
-import com.doof.passwordmanager.util.PasswordEncryptor;
 import com.doof.passwordmanager.util.ValidationException;
 
-import javax.crypto.SecretKey;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,6 +19,7 @@ import java.util.Objects;
 /**
  * Account CRUD on top of {@link EntryDao}. Every field is encrypted together into one
  * blob, so lookups, search and duplicate checks run in memory after decryption.
+ * The entry id is bound as AES-GCM AAD, so a ciphertext moved to another row fails to decrypt.
  */
 public class AccountService {
     public static class AccountView {
@@ -86,10 +89,8 @@ public class AccountService {
             checkUnlocked();
             checkDuplicate(email, website, null);
 
-            Entry entry = new Entry();
-            encryptInto(entry, new EntryCodec.Fields(website, email, new String(plaintextPassword), null));
-            entryDao.insert(entry);
-            return entry.getId();
+            EntryCodec.Fields fields = new EntryCodec.Fields(website, email, new String(plaintextPassword), null);
+            return entryDao.insert(id -> seal(id, fields)).getId();
         } finally {
             Arrays.fill(plaintextPassword, '\0');
         }
@@ -126,8 +127,9 @@ public class AccountService {
                 password = new String(plaintextPassword);
             }
 
-            encryptInto(existing, new EntryCodec.Fields(website, email, password, current.notes));
-            entryDao.update(existing);
+            Entry sealed = seal(id, new EntryCodec.Fields(website, email, password, current.notes));
+            sealed.setId(id);
+            entryDao.update(sealed);
         } finally {
             if (plaintextPassword != null) Arrays.fill(plaintextPassword, '\0');
         }
@@ -183,25 +185,30 @@ public class AccountService {
         );
     }
 
-    private void encryptInto(Entry entry, EntryCodec.Fields fields) {
-        checkUnlocked();
-        SecretKey key = vaultService.getSessionKeyForServices();
-        byte[] iv = PasswordEncryptor.generateIV();
-        // PasswordEncryptor.encrypt wipes the plaintext bytes.
-        byte[] ciphertext = PasswordEncryptor.encrypt(EntryCodec.encode(fields), key, iv);
-        entry.setDataEnc(ciphertext);
-        entry.setIv(iv);
-        entry.setEncVersion(vaultService.getMetadata().getEncVersion());
+    /** Encrypts {@code fields} for entry {@code id}; returns an Entry holding blob, IV and enc version. */
+    private Entry seal(long id, EntryCodec.Fields fields) {
+        byte[] plaintext = EntryCodec.encode(fields);
+        try {
+            AesGcm.Sealed sealed = vaultService.withEncKey(key -> AesGcm.encrypt(key, plaintext, aad(id)));
+            return new Entry(sealed.ciphertext, sealed.iv, VaultService.ENC_VERSION);
+        } finally {
+            SecureWipe.wipe(plaintext);
+        }
     }
 
     private EntryCodec.Fields decryptFields(Entry stored) {
-        checkUnlocked();
-        SecretKey key = vaultService.getSessionKeyForServices();
-        byte[] plaintextBytes = PasswordEncryptor.decrypt(stored.getDataEnc(), key, stored.getIv());
+        byte[] plaintext = vaultService.withEncKey(key ->
+                AesGcm.decrypt(key, stored.getIv(), stored.getDataEnc(), aad(stored.getId())));
         try {
-            return EntryCodec.decode(plaintextBytes);
+            return EntryCodec.decode(plaintext);
         } finally {
-            Arrays.fill(plaintextBytes, (byte) 0);
+            SecureWipe.wipe(plaintext);
         }
+    }
+
+    /** AAD = "doof-entry" + 8-byte big-endian entry id. */
+    static byte[] aad(long id) {
+        byte[] tag = "doof-entry".getBytes(StandardCharsets.US_ASCII);
+        return ByteBuffer.allocate(tag.length + Long.BYTES).put(tag).putLong(id).array();
     }
 }

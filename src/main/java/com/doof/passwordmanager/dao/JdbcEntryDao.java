@@ -8,6 +8,7 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.LongFunction;
 
 public class JdbcEntryDao implements EntryDao {
 
@@ -26,33 +27,48 @@ public class JdbcEntryDao implements EntryDao {
     }
 
     @Override
-    public void insert(Entry entry) {
-        String sql = "INSERT INTO entries (data_enc, iv, enc_version, created_at, updated_at) VALUES (?, ?, ?, ?, ?)";
+    public Entry insert(LongFunction<Entry> seal) {
+        // Placeholder row reserves the id; it is filled in before commit, so it is never visible.
+        String insertSql = "INSERT INTO entries (data_enc, iv, enc_version, created_at, updated_at) VALUES (x'', x'', 0, ?, ?)";
+        String fillSql = "UPDATE entries SET data_enc = ?, iv = ?, enc_version = ? WHERE id = ?";
         long now = clock.millis();
 
-        try (Connection conn = connectionManager.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-
-            ps.setBytes(1, entry.getDataEnc());
-            ps.setBytes(2, entry.getIv());
-            ps.setInt(3, entry.getEncVersion());
-            ps.setLong(4, now);
-            ps.setLong(5, now);
-
-            int affected = ps.executeUpdate();
-            if (affected == 0) {
-                throw new SQLException("Inserting entry failed, no rows affected.");
-            }
-
-            try (ResultSet rs = ps.getGeneratedKeys()) {
-                if (!rs.next()) {
-                    throw new SQLException("Inserting entry failed, no id returned.");
+        try (Connection conn = connectionManager.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                long id;
+                try (PreparedStatement ps = conn.prepareStatement(insertSql, Statement.RETURN_GENERATED_KEYS)) {
+                    ps.setLong(1, now);
+                    ps.setLong(2, now);
+                    if (ps.executeUpdate() == 0) {
+                        throw new SQLException("Inserting entry failed, no rows affected.");
+                    }
+                    try (ResultSet rs = ps.getGeneratedKeys()) {
+                        if (!rs.next()) {
+                            throw new SQLException("Inserting entry failed, no id returned.");
+                        }
+                        id = rs.getLong(1);
+                    }
                 }
-                entry.setId(rs.getLong(1));
-            }
-            entry.setCreatedAt(now);
-            entry.setUpdatedAt(now);
 
+                Entry entry = Objects.requireNonNull(seal.apply(id), "seal returned null");
+                try (PreparedStatement ps = conn.prepareStatement(fillSql)) {
+                    ps.setBytes(1, entry.getDataEnc());
+                    ps.setBytes(2, entry.getIv());
+                    ps.setInt(3, entry.getEncVersion());
+                    ps.setLong(4, id);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                entry.setId(id);
+                entry.setCreatedAt(now);
+                entry.setUpdatedAt(now);
+                return entry;
+            } catch (SQLException | RuntimeException e) {
+                conn.rollback();
+                throw e;
+            }
         } catch (SQLException e) {
             throw new RuntimeException("Error inserting entry", e);
         }

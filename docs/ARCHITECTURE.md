@@ -75,7 +75,7 @@ CREATE TABLE vault_metadata (
 );
 
 CREATE TABLE entries (
-  id           INTEGER PRIMARY KEY,
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,  -- never reused: id is the AES-GCM AAD
   data_enc     BLOB    NOT NULL,   -- AES-GCM(JSON {site,user,password,notes})
   iv           BLOB    NOT NULL,
   enc_version  INTEGER NOT NULL,

@@ -1,4 +1,4 @@
--- DOOF Vault schema, version 1 (see docs/ARCHITECTURE.md §6).
+-- DOOF Vault schema, version 2 (see docs/ARCHITECTURE.md §6).
 -- Applied once by ConnectionManager when a new vault file is created.
 
 CREATE TABLE vault_metadata (
@@ -14,7 +14,7 @@ CREATE TABLE vault_metadata (
 );
 
 CREATE TABLE entries (
-  id           INTEGER PRIMARY KEY,
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,  -- never reused: id is the AES-GCM AAD
   data_enc     BLOB    NOT NULL,   -- AES-GCM(JSON {site,user,password,notes})
   iv           BLOB    NOT NULL,
   enc_version  INTEGER NOT NULL,

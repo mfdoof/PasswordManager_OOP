@@ -8,6 +8,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -30,8 +31,7 @@ class JdbcEntryDaoTest {
 
     @Test
     void insertAssignsIdAndTimestamps() {
-        Entry e = entry(1);
-        dao.insert(e);
+        Entry e = insert(1);
 
         assertTrue(e.getId() > 0);
         assertEquals(T0, e.getCreatedAt());
@@ -39,18 +39,50 @@ class JdbcEntryDaoTest {
     }
 
     @Test
+    void sealReceivesTheIdThatIsStored() {
+        AtomicLong seen = new AtomicLong();
+        Entry e = dao.insert(id -> {
+            seen.set(id);
+            return new Entry(new byte[]{(byte) id}, new byte[]{1}, 1);
+        });
+
+        assertEquals(seen.get(), e.getId());
+        assertArrayEquals(new byte[]{(byte) e.getId()}, dao.findById(e.getId()).getDataEnc());
+    }
+
+    @Test
+    void failedSealStoresNothing() {
+        assertThrows(IllegalStateException.class, () -> dao.insert(id -> {
+            throw new IllegalStateException("boom");
+        }));
+        assertTrue(dao.findAll().isEmpty());
+    }
+
+    @Test
+    void idsAreNeverReusedAfterDelete() {
+        // The id is the AES-GCM AAD, so a reused id would let an old ciphertext validate in a new row.
+        Entry a = insert(1);
+        Entry b = insert(2);
+        dao.delete(b.getId());
+
+        Entry c = insert(3);
+        assertTrue(c.getId() > b.getId(), "id " + c.getId() + " reused");
+        assertNotEquals(a.getId(), c.getId());
+    }
+
+    @Test
     void findByIdRoundTripsBytesExactly() {
         // Include every byte value so nothing is treated as text or truncated at NUL.
         byte[] blob = new byte[256];
         for (int i = 0; i < blob.length; i++) blob[i] = (byte) i;
-        Entry e = new Entry(blob, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, 1);
-        dao.insert(e);
+        byte[] iv = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+        Entry e = dao.insert(id -> new Entry(blob, iv, 1));
 
         Entry found = dao.findById(e.getId());
         assertNotNull(found);
         assertEquals(e.getId(), found.getId());
         assertArrayEquals(blob, found.getDataEnc());
-        assertArrayEquals(e.getIv(), found.getIv());
+        assertArrayEquals(iv, found.getIv());
         assertEquals(1, found.getEncVersion());
         assertEquals(T0, found.getCreatedAt());
         assertEquals(T0, found.getUpdatedAt());
@@ -65,10 +97,7 @@ class JdbcEntryDaoTest {
     void findAllReturnsEntriesInIdOrder() {
         assertTrue(dao.findAll().isEmpty());
 
-        Entry a = entry(1), b = entry(2), c = entry(3);
-        dao.insert(a);
-        dao.insert(b);
-        dao.insert(c);
+        Entry a = insert(1), b = insert(2), c = insert(3);
 
         List<Entry> all = dao.findAll();
         assertEquals(List.of(a.getId(), b.getId(), c.getId()), all.stream().map(Entry::getId).toList());
@@ -77,8 +106,7 @@ class JdbcEntryDaoTest {
 
     @Test
     void updateReplacesBlobAndBumpsUpdatedAt() {
-        Entry e = entry(1);
-        dao.insert(e);
+        Entry e = insert(1);
         clock.advance(1_000);
 
         e.setDataEnc(new byte[]{9, 9});
@@ -104,9 +132,7 @@ class JdbcEntryDaoTest {
 
     @Test
     void deleteRemovesOnlyThatEntry() {
-        Entry a = entry(1), b = entry(2);
-        dao.insert(a);
-        dao.insert(b);
+        Entry a = insert(1), b = insert(2);
 
         dao.delete(a.getId());
 
@@ -122,8 +148,13 @@ class JdbcEntryDaoTest {
 
     @Test
     void requiredColumnsRejectNull() {
-        assertThrows(RuntimeException.class, () -> dao.insert(new Entry(null, new byte[]{1}, 1)));
-        assertThrows(RuntimeException.class, () -> dao.insert(new Entry(new byte[]{1}, null, 1)));
+        assertThrows(RuntimeException.class, () -> dao.insert(id -> new Entry(null, new byte[]{1}, 1)));
+        assertThrows(RuntimeException.class, () -> dao.insert(id -> new Entry(new byte[]{1}, null, 1)));
+        assertTrue(dao.findAll().isEmpty());
+    }
+
+    private Entry insert(int marker) {
+        return dao.insert(id -> entry(marker));
     }
 
     private static Entry entry(int marker) {
