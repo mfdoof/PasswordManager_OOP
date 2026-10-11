@@ -54,6 +54,22 @@ The order of precedence is `--vault`, then `DOOF_VAULT_PATH`, then `~/.doof/vaul
 | `--ascii` | plain `+ - \|` borders (also used automatically without a UTF-8 locale) |
 | `--no-color` | monochrome; same as setting `NO_COLOR` |
 
+## Backup
+
+```bash
+java -jar target/doof-vault.jar backup [--vault <path>] [--out <dir>] [--keep N]
+```
+
+Copies the encrypted vault file with SQLite's online backup API (safe while the app is open), verifies the copy (integrity check, schema version, vault set up), saves it as `vault-YYYYMMDD-HHMMSS.db` with `600` permissions in `~/.doof/backups` (`700`), then keeps the newest 14 (`--keep`). It never asks for the master password; a backup is exactly as encrypted as the vault. Output is plain text for cron/launchd/systemd.
+
+| Exit code | Meaning |
+|---|---|
+| 0 | backup written and verified (old copies pruned) |
+| 1 | backup failed; no new file kept, nothing pruned |
+| 2 | usage error |
+
+To restore, quit the app and copy a backup over your `vault.db`; it opens with the master password that was current when the backup was taken.
+
 ## Keys
 
 | Key | Action |

@@ -12,7 +12,8 @@ public final class TuiOptions {
             "usage: doof-vault [--vault <path>] [--ascii] [--no-color]",
             "  --vault <path>  vault file (default: $DOOF_VAULT_PATH, then ~/.doof/vault.db)",
             "  --ascii         draw borders with + - | instead of box-drawing characters",
-            "  --no-color      monochrome (same as setting NO_COLOR)");
+            "  --no-color      monochrome (same as setting NO_COLOR)",
+            "       doof-vault backup --help   (back up the vault file; see the backup usage)");
 
     private final boolean ascii;
     private final boolean noColor;
