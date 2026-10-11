@@ -319,7 +319,7 @@ public final class EntryModal implements TuiScreen {
         parent.draw(g, size, t);
 
         int col = (size.getColumns() - WIDTH) / 2;
-        int top = Math.max(0, (size.getRows() - HEIGHT) / 2);
+        int top = parent.modalTop(size.getRows(), HEIGHT);
         g.setBackgroundColor(t.background);
         g.fillRectangle(new TerminalPosition(col, top), new TerminalSize(WIDTH, HEIGHT), ' ');
         g.setForegroundColor(t.primary);

@@ -23,7 +23,7 @@ import java.util.function.Function;
  * <p>
  * Decrypt on demand: after unlock only site + user are kept in memory (the index), which
  * serves listing, search and duplicate checks. Passwords and notes are decrypted only when
- * asked for ({@link #withPassword}, {@link #revealNotes}); passwords are wiped right after use.
+ * asked for ({@link #withPassword}, {@link #withNotes}) and wiped right after use.
  * The index is dropped when the vault locks.
  */
 public class EntryService {
@@ -84,22 +84,6 @@ public class EntryService {
         return index().get(id);
     }
 
-    /** Case-insensitive substring match on site or user, in id order. */
-    public synchronized List<EntrySummary> search(String query, int limit, int offset) {
-        String q = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
-        List<EntrySummary> matches = new ArrayList<>();
-        int skipped = 0;
-        for (EntrySummary e : index().values()) {
-            boolean match = e.site.toLowerCase(Locale.ROOT).contains(q)
-                    || e.user.toLowerCase(Locale.ROOT).contains(q);
-            if (match && skipped++ >= offset) {
-                if (matches.size() >= limit) break;
-                matches.add(e);
-            }
-        }
-        return matches;
-    }
-
     /**
      * Decrypts the password of entry {@code id}, passes it to {@code use}, and wipes it as
      * soon as {@code use} returns. {@code use} must not keep the array.
@@ -128,11 +112,6 @@ public class EntryService {
         }
     }
 
-    /** Decrypts the notes of entry {@code id} on demand; null if none. */
-    public synchronized String revealNotes(long id) {
-        return decrypt(require(id), EntryCodec::decodeNotes);
-    }
-
     /** Adds an entry. Wipes {@code password}. {@code notes} may be null. */
     public synchronized long addEntry(String site, String user, char[] password, String notes) {
         Objects.requireNonNull(site, "site is required");
@@ -153,7 +132,13 @@ public class EntryService {
             checkDuplicate(site, user, null);
 
             String s = site, u = user;
-            Entry stored = entryDao.insert(id -> seal(id, s, u, password, notes));
+            char[] notesChars = notes == null ? null : notes.toCharArray();
+            Entry stored;
+            try {
+                stored = entryDao.insert(id -> seal(id, s, u, password, notesChars));
+            } finally {
+                SecureWipe.wipe(notesChars);
+            }
             index().put(stored.getId(), toSummary(stored, s, u));
             return stored.getId();
         } finally {
@@ -168,6 +153,7 @@ public class EntryService {
      */
     public synchronized void updateEntry(long id, String site, String user, char[] newPassword, String notes) {
         char[] password = null;
+        char[] keptNotes = null;
         try {
             checkUnlocked();
 
@@ -194,7 +180,7 @@ public class EntryService {
             } else {
                 password = decrypt(existing, EntryCodec::decodePassword);
             }
-            String keptNotes = notes != null ? notes : decrypt(existing, EntryCodec::decodeNotes);
+            keptNotes = notes != null ? notes.toCharArray() : decrypt(existing, EntryCodec::decodeNotesChars);
 
             Entry sealed = seal(id, site, user, password, keptNotes);
             sealed.setId(id);
@@ -202,6 +188,7 @@ public class EntryService {
             index().put(id, new EntrySummary(id, site, user, current.createdAt, Instant.ofEpochMilli(sealed.getUpdatedAt())));
         } finally {
             SecureWipe.wipe(password);
+            SecureWipe.wipe(keptNotes);
             SecureWipe.wipe(newPassword);
         }
     }
@@ -267,7 +254,7 @@ public class EntryService {
     }
 
     /** Encrypts the fields for entry {@code id}; returns an Entry holding blob, IV and enc version. */
-    private Entry seal(long id, String site, String user, char[] password, String notes) {
+    private Entry seal(long id, String site, String user, char[] password, char[] notes) {
         byte[] plaintext = EntryCodec.encode(site, user, password, notes);
         try {
             AesGcm.Sealed sealed = vaultService.withEncKey(key -> AesGcm.encrypt(key, plaintext, aad(id)));

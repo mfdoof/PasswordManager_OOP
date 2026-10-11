@@ -67,8 +67,8 @@ class VaultRotationTest {
         assertEquals("Alice1Pass", es.withPassword(a, String::new));
         assertEquals("Bob2Passw", es.withPassword(b, String::new));
         assertEquals("Carol3Pass", es.withPassword(c, String::new));
-        assertEquals("note a", es.revealNotes(a));
-        assertNull(es.revealNotes(b));
+        assertEquals("note a", es.withNotes(a, n -> n == null ? null : new String(n)));
+        assertNull(es.withNotes(b, n -> n == null ? null : new String(n)));
     }
 
     private VaultMetadata metadata() {

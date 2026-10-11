@@ -86,14 +86,6 @@ public class ApplicationConnector {
         return entryService.listEntries();
     }
 
-    public EntrySummary getEntry(long id) {
-        return entryService.getEntry(id);
-    }
-
-    public List<EntrySummary> search(String query, int limit, int offset) {
-        return entryService.search(query, limit, offset);
-    }
-
     /** Decrypts the password on demand; it is wiped as soon as {@code use} returns. */
     public <T> T withPassword(long id, Function<char[], T> use) {
         return entryService.withPassword(id, use);
@@ -102,10 +94,6 @@ public class ApplicationConnector {
     /** Decrypts the notes on demand (null if none); they are wiped as soon as {@code use} returns. */
     public <T> T withNotes(long id, Function<char[], T> use) {
         return entryService.withNotes(id, use);
-    }
-
-    public String revealNotes(long id) {
-        return entryService.revealNotes(id);
     }
 
     public long addEntry(String site, String user, char[] password, String notes) {

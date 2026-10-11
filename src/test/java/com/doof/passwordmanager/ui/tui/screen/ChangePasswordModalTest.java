@@ -80,7 +80,7 @@ class ChangePasswordModalTest {
 
         h.connector.lockVault();
         h.connector.unlockVault(NEW.toCharArray());
-        assertEquals("note", h.connector.revealNotes(id));
+        assertEquals("note", h.connector.withNotes(id, String::new));
     }
 
     @Test

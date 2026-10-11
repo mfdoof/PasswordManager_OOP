@@ -39,10 +39,6 @@ public final class TuiApp {
             System.exit(2);
             return;
         }
-        if (options.swing()) {
-            com.doof.passwordmanager.app.Main.main(args);
-            return;
-        }
         // The clipboard uses AWT; on macOS this keeps it from adding a Dock icon for a terminal app.
         System.setProperty("apple.awt.UIElement", "true");
 

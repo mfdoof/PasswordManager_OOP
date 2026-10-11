@@ -35,8 +35,8 @@ final class EntryCodec {
 
     private EntryCodec() {}
 
-    /** UTF-8 JSON payload; the caller wipes the result. {@code password} is not modified. */
-    static byte[] encode(String site, String user, char[] password, String notes) {
+    /** UTF-8 JSON payload; the caller wipes the result. {@code password} and {@code notes} (may be null) are not modified. */
+    static byte[] encode(String site, String user, char[] password, char[] notes) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put(SITE, site);
         m.put(USER, user);
@@ -61,11 +61,6 @@ final class EntryCodec {
     static char[] decodeNotesChars(byte[] json) {
         Map<String, Object> m = parse(json, key -> NOTES.equals(key) ? Mode.SECRET : Mode.SKIP);
         return (char[]) m.get(NOTES);
-    }
-
-    static String decodeNotes(byte[] json) {
-        Map<String, Object> m = parse(json, key -> NOTES.equals(key) ? Mode.VALUE : Mode.SKIP);
-        return string(m, NOTES);
     }
 
     private static Map<String, Object> parse(byte[] json, java.util.function.Function<String, Mode> modeFor) {

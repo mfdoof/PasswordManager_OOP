@@ -408,13 +408,38 @@ public final class VaultScreen implements TuiScreen {
         hideSecrets();  // help overlay, lock, quit: nothing stays revealed
     }
 
+    /** Rows outside the list: borders, search, dividers, column header, 4 detail rows, footer. */
+    static final int FIXED_ROWS = 12;
+    static final int MIN_LIST_ROWS = 3;
+
+    /**
+     * List height: as many rows as there are entries (so the details pane sits right under them),
+     * at least 3 (room for the empty / no-match message), at most what the terminal allows. Based on
+     * the total, not the filtered count, so the frame does not jump while searching.
+     */
+    int listRowsFor(int terminalRows) {
+        int max = Math.max(1, terminalRows - FIXED_ROWS);
+        return Math.min(max, Math.max(MIN_LIST_ROWS, all.size()));
+    }
+
+    /** Height of the vault frame; the rest of the terminal below it stays empty. */
+    int frameHeight(int terminalRows) {
+        return Math.min(terminalRows, FIXED_ROWS + listRowsFor(terminalRows));
+    }
+
+    /** Top row for a modal of {@code height} rows drawn over this screen: centered on the frame. */
+    int modalTop(int terminalRows, int height) {
+        int area = Math.max(frameHeight(terminalRows), height + 2);
+        return Math.max(0, Math.min(terminalRows - height, (area - height) / 2));
+    }
+
     @Override
     public void draw(TextGraphics g, TerminalSize size, Theme t) {
         int w = size.getColumns();
-        int h = size.getRows();
-        int detailsTop = h - 8;            // divider row of the details pane
         int listTop = 4;
-        listRows = Math.max(1, detailsTop - listTop);
+        listRows = listRowsFor(size.getRows());
+        int detailsTop = listTop + listRows;  // divider row of the details pane
+        int h = detailsTop + 8;              // frame height; space below stays empty
 
         // Frame and dividers.
         g.setForegroundColor(t.dim);
@@ -483,8 +508,14 @@ public final class VaultScreen implements TuiScreen {
         int inner = w - 4;
         int dateW = 10;
         int rest = Math.max(10, inner - 2 - dateW - 4);
-        int siteW = rest * 45 / 100;
-        int userW = rest - siteW;
+        // Fit the content, capped at ~35% / ~45%; leftover width stays on the right.
+        int longestSite = 0, longestUser = 0;
+        for (EntrySummary e : all) {
+            longestSite = Math.max(longestSite, e.getSite().length());
+            longestUser = Math.max(longestUser, e.getUser().length());
+        }
+        int siteW = Math.max(4, Math.min(longestSite, rest * 35 / 100));
+        int userW = Math.max(8, Math.min(longestUser, rest * 45 / 100));
         int siteCol = 4;
         int userCol = siteCol + siteW + 2;
         int dateCol = userCol + userW + 2;

@@ -10,13 +10,13 @@ class EntryCodecTest {
 
     @Test
     void roundTripsAllFields() {
-        byte[] json = EntryCodec.encode("example.com", "me@example.com", "S3cret!pass".toCharArray(), "line1\nline2");
+        byte[] json = EntryCodec.encode("example.com", "me@example.com", "S3cret!pass".toCharArray(), "line1\nline2".toCharArray());
 
         EntryCodec.Summary s = EntryCodec.decodeSummary(json);
         assertEquals("example.com", s.site);
         assertEquals("me@example.com", s.user);
         assertArrayEquals("S3cret!pass".toCharArray(), EntryCodec.decodePassword(json));
-        assertEquals("line1\nline2", EntryCodec.decodeNotes(json));
+        assertArrayEquals("line1\nline2".toCharArray(), EntryCodec.decodeNotesChars(json));
     }
 
     @Test
@@ -25,7 +25,7 @@ class EntryCodecTest {
         byte[] json = EntryCodec.encode("site", "user", tricky.toCharArray(), null);
 
         assertEquals(tricky, new String(EntryCodec.decodePassword(json)));
-        assertNull(EntryCodec.decodeNotes(json));
+        assertNull(EntryCodec.decodeNotesChars(json));
     }
 
     @Test
@@ -43,7 +43,7 @@ class EntryCodecTest {
         assertEquals("abc", EntryCodec.decodeSummary(bytes).site);
         assertEquals("u", EntryCodec.decodeSummary(bytes).user);
         assertArrayEquals("p/w".toCharArray(), EntryCodec.decodePassword(bytes));
-        assertNull(EntryCodec.decodeNotes(bytes));
+        assertNull(EntryCodec.decodeNotesChars(bytes));
     }
 
     @Test

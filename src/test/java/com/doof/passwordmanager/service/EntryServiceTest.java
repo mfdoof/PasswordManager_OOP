@@ -62,34 +62,18 @@ class EntryServiceTest {
     }
 
     @Test
-    void listAndSearchNeverContainThePassword() {
+    void listNeverContainsThePassword() {
         entries.addEntry("example.com", "me@example.com", "Hunter2Pass".toCharArray(), "my secret note");
 
         List<EntrySummary> listed = entries.listEntries();
-        List<EntrySummary> found = entries.search("example", 10, 0);
 
         assertEquals(1, listed.size());
-        assertEquals(1, found.size());
-        for (EntrySummary e : List.of(listed.get(0), found.get(0), entries.getEntry(listed.get(0).getId()))) {
+        for (EntrySummary e : List.of(listed.get(0), entries.getEntry(listed.get(0).getId()))) {
             assertEquals("example.com", e.getSite());
             assertEquals("me@example.com", e.getUser());
             assertFalse(e.toString().contains("Hunter2Pass"));
             assertFalse(e.toString().contains("my secret note"));
         }
-    }
-
-    @Test
-    void searchMatchesSiteOrUserCaseInsensitivelyWithPaging() {
-        entries.addEntry("example.com", "me@example.com", "Hunter2Pass".toCharArray(), null);
-        entries.addEntry("other.org", "me@example.com", "Hunter2Pass".toCharArray(), null);
-        entries.addEntry("third.net", "x@third.net", "Hunter2Pass".toCharArray(), null);
-
-        assertEquals(1, entries.search("OTHER", 10, 0).size());
-        assertEquals(2, entries.search("me@", 10, 0).size());
-        assertEquals(3, entries.search("", 10, 0).size());
-        assertEquals("other.org", entries.search("me@", 1, 1).get(0).getSite());
-        assertEquals(1, entries.search("me@", 1, 0).size());
-        assertTrue(entries.search("nomatch", 10, 0).isEmpty());
     }
 
     @Test
@@ -101,7 +85,6 @@ class EntryServiceTest {
         int loads = countingDao.findAllCalls.get();
 
         entries.listEntries();
-        entries.search("ex", 10, 0);
         entries.listEntries();
 
         assertEquals(loads, countingDao.findAllCalls.get());
@@ -113,9 +96,8 @@ class EntryServiceTest {
         vault.lockVault();
 
         assertThrows(RuntimeException.class, () -> entries.listEntries());
-        assertThrows(RuntimeException.class, () -> entries.search("ex", 10, 0));
         assertThrows(RuntimeException.class, () -> entries.withPassword(id, String::new));
-        assertThrows(RuntimeException.class, () -> entries.revealNotes(id));
+        assertThrows(RuntimeException.class, () -> entries.withNotes(id, n -> n == null ? null : new String(n)));
     }
 
     // --- reveal on demand ---
@@ -171,10 +153,10 @@ class EntryServiceTest {
     @Test
     void notesAreStoredAndRevealedOnDemand() {
         long id = entries.addEntry("example.com", "me@example.com", "Hunter2Pass".toCharArray(), "line1\nline2");
-        assertEquals("line1\nline2", entries.revealNotes(id));
+        assertEquals("line1\nline2", entries.withNotes(id, n -> n == null ? null : new String(n)));
 
         long none = entries.addEntry("other.org", "me@example.com", "Hunter2Pass".toCharArray(), null);
-        assertNull(entries.revealNotes(none));
+        assertNull(entries.withNotes(none, n -> n == null ? null : new String(n)));
     }
 
     @Test
@@ -198,10 +180,10 @@ class EntryServiceTest {
         assertFalse(Arrays.equals(ivBefore, entryDao.findById(id).getIv()), "must re-encrypt with a fresh IV");
         assertEquals("new@example.com", entries.getEntry(id).getUser());
         assertEquals("Hunter2Pass", entries.withPassword(id, String::new));
-        assertEquals("keep me", entries.revealNotes(id));
+        assertEquals("keep me", entries.withNotes(id, n -> n == null ? null : new String(n)));
 
         entries.updateEntry(id, "example.com", "new@example.com", null, "changed");
-        assertEquals("changed", entries.revealNotes(id));
+        assertEquals("changed", entries.withNotes(id, n -> n == null ? null : new String(n)));
     }
 
     @Test

@@ -49,6 +49,10 @@ class EntryModalTest {
         h.key(new KeyStroke(c, true, false));
     }
 
+    private String notes(long id) {
+        return h.connector.withNotes(id, n -> n == null ? null : new String(n));
+    }
+
     private String password(long id) {
         return h.connector.withPassword(id, String::new);
     }
@@ -92,7 +96,7 @@ class EntryModalTest {
         EntrySummary sel = v.selectedEntry();
         assertEquals("github.com", sel.getSite(), "selection on the new entry");
         assertEquals("s3cret-PW", password(sel.getId()));
-        assertEquals("my note", h.connector.revealNotes(sel.getId()));
+        assertEquals("my note", notes(sel.getId()));
         assertTrue(h.text().contains("ok: added github.com"), h.text());
         assertTrue(h.text().contains("2 entries"));
     }
@@ -302,9 +306,9 @@ class EntryModalTest {
         h.press(KeyType.Enter);
 
         assertTrue(h.text().contains("ok: saved github.com"), h.text());
-        assertEquals("mave2", h.connector.getEntry(id).getUser());
+        assertEquals("mave2", h.connector.listEntries().stream().filter(e -> e.getId() == id).findFirst().orElseThrow().getUser());
         assertEquals("Orig1nal!", password(id));
-        assertEquals("keep me", h.connector.revealNotes(id));
+        assertEquals("keep me", notes(id));
         assertEquals(id, v.selectedEntry().getId());
     }
 

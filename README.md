@@ -1,28 +1,34 @@
 # DOOF Vault
 
-A local, single-user password manager in Java. The whole vault is one encrypted SQLite file, protected by a master password with Argon2id, HKDF and AES-256-GCM.
+A local, single-user password manager for the terminal. The whole vault is one encrypted SQLite file, protected by a master password with Argon2id, HKDF and AES-256-GCM. It is keyboard-only and works locally, over SSH and on a headless console.
 
-It started as a university OOP project (Java + Swing + MySQL) and is being rebuilt with a security-first design. Phase 1 (hardening) is complete; a terminal UI is next.
+It started as a university OOP project (Java + Swing + MySQL) and was rebuilt with a security-first design and a terminal UI.
+
+<!-- Recording: replace with an asciinema embed or GIF -->
+> Demo recording coming soon.
 
 ## Features
 
 - **Strong key derivation:** Argon2id (64 MiB, 3 iterations), with parameters stored per vault so they can be raised later
 - **Separate keys:** HKDF splits the master key into an auth key (stored) and an encryption key (memory only)
 - **Everything encrypted:** site, username, password and notes are one AES-256-GCM blob per entry, with the entry id bound as AAD to stop row swapping
-- **Decrypt on demand:** only site + username are in memory after unlock; passwords are decrypted when revealed or copied, then wiped
-- **Unlock throttling:** exponential delay (1s → 30s cap) that survives restarts
+- **Decrypt on demand:** only site + username are in memory after unlock; a password or notes are decrypted when revealed or copied, then wiped
+- **Unlock throttling:** exponential delay (1s to 30s) that survives restarts
+- **Idle auto-lock:** 5 minutes without a keypress locks the vault, wipes keys and clears the screen
+- **Clipboard with auto-clear:** a copied password is cleared after 20 seconds, on lock and on quit (only if it is still ours)
+- **Password generator:** SecureRandom, length 8-128, four character sets
 - **Master password rotation:** re-encrypts everything in a single transaction; any failure rolls back
 - **File hardening:** vault created as `600` in a `700` directory, warning if permissions are looser; no credentials anywhere
-- **Clipboard auto-clear** after 20 seconds; reveal re-masks after 10 seconds
 
 ## Why it's built this way
 
-Each choice answers a specific threat: a stolen vault file, guessing, tampering, a password lingering in memory. [SECURITY.md](SECURITY.md) covers the threat model, crypto and known limits. It also explains why throttling does not stop offline attacks on a copied file. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has the full design: layers, key hierarchy, schema and the planned TUI.
+Each choice answers a specific threat: a stolen vault file, guessing, tampering, a password lingering in memory or on screen. [SECURITY.md](SECURITY.md) covers the threat model, crypto and known limits, including why throttling does not stop offline attacks on a copied file. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has the design (layers, key hierarchy, schema) and [docs/TUI_DESIGN.md](docs/TUI_DESIGN.md) the terminal UI.
 
 ## Requirements
 
 - Java 17+
-- Maven 3.9+
+- Maven 3.9+ (to build)
+- A terminal of at least 80x24
 
 ## Build and run
 
@@ -31,7 +37,7 @@ mvn package                     # runs the tests, builds target/doof-vault.jar
 java -jar target/doof-vault.jar
 ```
 
-The first run creates a new vault. Choose where it lives with:
+The first run creates a new vault (master password: 12+ characters with upper case, lower case and a digit). Choose where it lives with:
 
 ```bash
 java -jar target/doof-vault.jar --vault /path/to/vault.db
@@ -40,11 +46,26 @@ DOOF_VAULT_PATH=/path/to/vault.db java -jar target/doof-vault.jar
 
 The order of precedence is `--vault`, then `DOOF_VAULT_PATH`, then `~/.doof/vault.db`.
 
-The JAR now starts the terminal UI (Phase 2, in progress: create, unlock and the vault list with search work; reveal/copy and editing are next). Flags: `--ascii` for plain `+ - |` borders, `--no-color` (or `NO_COLOR`) for monochrome. Until the TUI is complete, the original Swing app is still available with `--swing`. A minimal console harness, used for testing, is also included:
+| Flag | Effect |
+|---|---|
+| `--vault <path>` | vault file to open or create |
+| `--ascii` | plain `+ - \|` borders (also used automatically without a UTF-8 locale) |
+| `--no-color` | monochrome; same as setting `NO_COLOR` |
 
-```bash
-java -cp target/doof-vault.jar com.doof.passwordmanager.service.ConsolePasswordManager --vault /tmp/test.db
-```
+## Keys
+
+| Key | Action |
+|---|---|
+| `j` / `k`, arrows, `gg` / `G` | move through the list |
+| `/` | search site and username (`ESC` clears) |
+| `s` / `n` | reveal password / notes for 10s |
+| `c` / `u` | copy password (cleared after 20s) / username |
+| `a` / `e` / `d` | add / edit / delete (asks `[y/N]`) |
+| `p` | change master password |
+| `l` / `q` | lock / quit (both wipe keys and clear the screen) |
+| `?` | all keys |
+
+In the entry form: `TAB` moves between fields, `ENTER` saves, `ESC` cancels. On the generator row `g` generates and `v` shows the password (`ctrl+g` / `ctrl+v` work from any field). Over SSH the clipboard is reported as unavailable; use `s` to reveal instead.
 
 ## Tests
 
@@ -52,19 +73,23 @@ java -cp target/doof-vault.jar com.doof.passwordmanager.service.ConsolePasswordM
 mvn test
 ```
 
-The suite covers the crypto (including an RFC 5869 HKDF vector), tampering and row-swap detection, the DAOs against a temporary vault file, throttling with an injectable clock, decrypt-on-demand and wiping, and rotation. The rotation tests include real mid-transaction failures.
+The suite covers the crypto (including an RFC 5869 HKDF vector), tampering and row-swap detection, the DAOs against a temporary vault file, throttling and idle lock with an injectable clock, decrypt-on-demand and wiping, rotation with real mid-transaction failures, and every screen of the TUI on Lanterna's in-memory terminal. Tests run headless and never touch the real clipboard.
 
 ## Project structure
 
 ```
 src/main/java/com/doof/passwordmanager/
-├── app/       Swing UI (Main, Dashboard) and wiring (AppBootstrap); replaced by the TUI in Phase 2
-├── service/   VaultService (create/unlock/lock/rotate, throttling, auto-lock), EntryService (CRUD, search, reveal)
+├── ui/tui/    TuiApp (entry point, main loop), ScreenManager, Theme, TuiContext
+│   ├── screen/   Unlock, Create, Vault, entry form, change password, help
+│   ├── widget/   SecretField, TextField, StrengthMeter, PolicyView, PasswordGenerator, StatusBar
+│   └── clip/     SecureClipboard (auto-clear) over the AWT clipboard
+├── app/       AppBootstrap: wires DAOs and services for an opened vault
+├── service/   VaultService (create/unlock/lock/rotate, throttling, idle timer), EntryService (CRUD, reveal)
 ├── crypto/    Kdf + KdfParams (Argon2id), KeyHierarchy (HKDF), AesGcm, SecureWipe
 ├── dao/       JDBC DAOs for metadata, entries and rotation; they only ever see encrypted bytes
 ├── db/        ConnectionManager: vault path, file permissions, schema setup
 ├── model/     Entry, VaultMetadata
-└── util/      FlatJson, InputValidator
+└── util/      FlatJson, InputValidator, PasswordPolicy
 src/main/resources/db/schema.sql
 src/test/java/...  JUnit 5 tests
 ```
@@ -72,7 +97,7 @@ src/test/java/...  JUnit 5 tests
 ## Roadmap
 
 - [x] **Phase 1: Hardening.** Maven, SQLite, Argon2id + HKDF + AES-GCM, encrypted fields, decrypt on demand, throttling, rotation, docs
-- [ ] **Phase 2: TUI.** Lanterna terminal UI (works locally, over SSH and headless), idle auto-lock, password generator; remove Swing
+- [x] **Phase 2: TUI.** Lanterna terminal UI (local, SSH, headless), idle auto-lock, clipboard auto-clear, generator, change master password; Swing removed
 - [ ] **Phase 3: Deployment.** Homelab deployment, encrypted backups, file-ownership hardening
 
 ## Author

@@ -162,7 +162,7 @@ class VaultScreenTest {
         add(longSite, "user");
         open();
         assertFalse(line(4).contains(longSite), "not shown in full in the list: " + line(4));
-        assertTrue(line(4).contains("a-very-long-subdomain.wi..."), line(4));
+        assertTrue(line(4).contains("a-very-long-subdom..."), "site column capped at ~35%: " + line(4));
         assertTrue(h.text().contains("site:     " + longSite), "details pane has room for it");
     }
 
@@ -303,6 +303,56 @@ class VaultScreenTest {
         h.tick();
         assertInstanceOf(UnlockScreen.class, h.manager.current());
         assertTrue(h.text().contains("ok: auto-locked after 5 min idle"));
+    }
+
+    @Test
+    void contentIsCappedAt120ColumnsAndCentered() {
+        add("github.com", "mave");
+        open();
+        h.resize(160, 30);
+        String top = line(0);
+        assertEquals(160, top.length());
+        assertTrue(top.substring(0, 20).isBlank(), "left margin");
+        assertEquals('\u250c', top.charAt(20), "frame starts at column 20");
+        assertEquals('\u2510', top.charAt(139), "frame is 120 wide");
+        assertTrue(top.substring(140).isBlank(), "right margin");
+    }
+
+    @Test
+    void frameHugsTheListAndDetailsSitRightUnderIt() {
+        add("github.com", "mave");
+        open();
+        h.resize(100, 40);
+        // 1 entry -> 3 list rows (minimum) -> details divider at row 4 + 3 = 7, frame bottom at row 14.
+        assertTrue(line(7).contains(" details "), line(7));
+        assertTrue(line(8).contains("site:     github.com"), line(8));
+        assertTrue(line(14).contains("\u2514"), "frame ends right after the footer: " + line(14));
+        assertTrue(line(20).isBlank(), "empty space below the frame");
+    }
+
+    @Test
+    void columnsFitTheirContent() {
+        add("a.io", "bob");
+        open();
+        h.resize(120, 30);
+        String header = line(3);
+        int site = header.indexOf("SITE");
+        int user = header.indexOf("USERNAME");
+        int date = header.indexOf("UPDATED");
+        assertEquals(site + 4 + 2, user, "SITE column is as wide as its header");
+        assertEquals(user + 8 + 2, date, "USERNAME column is as wide as its header");
+    }
+
+    @Test
+    void modalIsCenteredOnTheFrameNotTheTerminal() {
+        add("github.com", "mave");
+        open();
+        h.resize(100, 60);
+        h.type("a");
+        int row = -1;
+        String[] lines = h.text().split("\n");
+        for (int i = 0; i < lines.length; i++) if (lines[i].contains(" add entry ")) { row = i; break; }
+        assertTrue(row >= 0 && row < 10, "modal near the top over the short frame, row " + row);
     }
 
     @Test

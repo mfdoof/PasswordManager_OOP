@@ -63,7 +63,7 @@ public final class HelpOverlay implements TuiScreen {
 
         int h = KEYS.size() + 4;
         int col = (size.getColumns() - WIDTH) / 2;
-        int row = Math.max(0, (size.getRows() - h) / 2);
+        int row = parent instanceof VaultScreen v ? v.modalTop(size.getRows(), h) : Math.max(0, (size.getRows() - h) / 2);
         g.setBackgroundColor(t.background);
         g.setForegroundColor(t.text);
         g.fillRectangle(new com.googlecode.lanterna.TerminalPosition(col, row),

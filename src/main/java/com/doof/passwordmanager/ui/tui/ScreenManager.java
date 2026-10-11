@@ -17,6 +17,8 @@ public final class ScreenManager {
 
     public static final int MIN_COLUMNS = 80;
     public static final int MIN_ROWS = 24;
+    /** Content is capped at this width and centered; wider terminals get empty margins. */
+    public static final int MAX_CONTENT_COLUMNS = 120;
     static final String QUIT_HINT = "resize the window or press [ctrl+c] to quit";
 
     private final Screen screen;
@@ -112,7 +114,11 @@ public final class ScreenManager {
         if (tooSmall(size)) {
             drawTooSmall(g, size);
         } else {
-            current.draw(g, size, theme);
+            int width = Math.min(size.getColumns(), MAX_CONTENT_COLUMNS);
+            int left = (size.getColumns() - width) / 2;
+            TerminalSize area = new TerminalSize(width, size.getRows());
+            // Screens draw in a translated, clipped sub-area, so they need no knowledge of the cap.
+            current.draw(g.newTextGraphics(new com.googlecode.lanterna.TerminalPosition(left, 0), area), area, theme);
         }
         screen.setCursorPosition(null);
         screen.refresh(complete ? Screen.RefreshType.COMPLETE : Screen.RefreshType.AUTOMATIC);
