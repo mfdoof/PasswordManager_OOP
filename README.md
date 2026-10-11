@@ -32,6 +32,26 @@ Each choice answers a specific threat: a stolen vault file, guessing, tampering,
 - Maven 3.9+ (to build)
 - A terminal of at least 80x24
 
+## Releases
+
+Each release on the [Releases page](https://github.com/mfdoof/PasswordManager_OOP/releases) has the runnable jar `doof-vault-<version>.jar` and a `SHA256SUMS` file. They are built and tested by GitHub Actions from the tagged commit on `main`.
+
+Download and verify by hand:
+
+```bash
+VERSION=2.0.0
+BASE=https://github.com/mfdoof/PasswordManager_OOP/releases/download/v$VERSION
+curl -fLO "$BASE/doof-vault-$VERSION.jar"
+curl -fLO "$BASE/SHA256SUMS"
+
+sha256sum -c SHA256SUMS          # Linux
+shasum -a 256 -c SHA256SUMS      # macOS
+
+java -jar doof-vault-$VERSION.jar
+```
+
+The check must print `doof-vault-<version>.jar: OK`; if it says `FAILED`, delete the jar and do not run it. Checksums catch corrupted or swapped downloads, but they come from the same release page, so they do not prove who published it; signed releases (cosign) are planned.
+
 ## Build and run
 
 ```bash
