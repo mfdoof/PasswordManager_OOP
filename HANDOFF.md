@@ -13,7 +13,7 @@ Read this first, then `docs/ARCHITECTURE.md` (the target design).
 - Owner: Mave (GitHub `mfdoof`). Repo: `git@github.com:mfdoof/PasswordManager_OOP.git`.
 
 ## Current state (as of 2026-10-11)
-- Unchanged original code in `src/com/doof/passwordmanager/` (no build tool, IntelliJ `.idea` files, MySQL connector).
+- Original code now in `src/main/java/com/doof/passwordmanager/`, built with Maven (Java 17, fat JAR via shade, main class `app.Main`). Still Swing + MySQL logic; no MySQL driver on the classpath anymore, so the app compiles but can't connect until Step 2 (SQLite).
 - Existing layers: `model`, `dao` (JDBC), `service`, `util` (PasswordHasher = PBKDF2, PasswordEncryptor = AES-GCM, InputValidator), `db/ConnectionManager`, `app` (Swing `Main`, `Dashboard`; also `ConsolePasswordManager`).
 
 ## Known issues in the original
@@ -24,7 +24,7 @@ Read this first, then `docs/ARCHITECTURE.md` (the target design).
 5. All passwords decrypted into the table model at load.
 6. No unlock throttling.
 7. `rotateVault` unimplemented.
-8. No build tool, no tests, thin README, two entry points.
+8. ~~No build tool~~ (fixed Step 1), no tests, thin README, two entry points.
 
 ## Decisions made
 | Topic | Decision |
@@ -38,7 +38,7 @@ Read this first, then `docs/ARCHITECTURE.md` (the target design).
 | Old vaults | No migration; fresh start |
 
 ## Next steps (Phase 1)
-1. [ ] Maven setup: `pom.xml`, move to `src/main/java`, deps (`sqlite-jdbc`, `bcprov`, JUnit 5), shade plugin; remove `.idea`, `*.iml`, MySQL lib; update `.gitignore` (`target/`, `*.db`).
+1. [x] Maven setup: `pom.xml`, move to `src/main/java`, deps (`sqlite-jdbc`, `bcprov`, JUnit 5), shade plugin; remove `.idea`, `*.iml`, MySQL lib; update `.gitignore` (`target/`, `*.db`).
 2. [ ] SQLite migration: new schema (ARCHITECTURE §6), `ConnectionManager` with path + perms checks, rewrite DAOs.
 3. [ ] Crypto: Argon2id + HKDF, AAD, tests (round-trip, wrong password, tampered ciphertext).
 4. [ ] Encrypt all entry fields; in-memory search.
@@ -51,3 +51,4 @@ Then Phase 2 (TUI) and Phase 3 (deployment) per ARCHITECTURE §11.
 
 ## Progress log
 - 2026-10-11: Reviewed codebase, agreed on design, wrote ARCHITECTURE.md and this handoff. No code changes yet.
+- 2026-10-11: Step 1 done. Added `pom.xml` (Java 17; sqlite-jdbc, bcprov-jdk18on, JUnit 5; shade plugin with Main-Class `com.doof.passwordmanager.app.Main`). `git mv src/com` to `src/main/java/com`. Removed `.idea/` and `Password_Manager.iml`; MySQL connector dropped (loaded only via `Class.forName`, so it still compiles). Removed an unused `java.lang.foreign` import (Java 22+ API) from `VaultMetadataDao` that broke the Java 17 build. `.gitignore`: `target/`, `.idea/`, `*.iml`, `*.db*`. `mvn package` passes. `db/schema.sql` is kept until Step 2.
