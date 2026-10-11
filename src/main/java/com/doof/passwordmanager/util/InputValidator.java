@@ -1,11 +1,7 @@
 package com.doof.passwordmanager.util;
 
-import com.doof.passwordmanager.dao.AccountDao;
-import com.doof.passwordmanager.model.Account;
-
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.List;
 import java.util.regex.Pattern;
 
 public final class InputValidator {
@@ -48,16 +44,6 @@ public final class InputValidator {
             new URL("https://" + website);
         } catch (MalformedURLException e) {
             throw new ValidationException("Invalid website format.");
-        }
-    }
-
-    public static void checkDuplicate(AccountDao accountDao, String email, String website) {
-        List<Account> existing = accountDao.search(email, 1, 0);
-        boolean duplicate = existing.stream()
-                .anyMatch(acc -> acc.getEmail().equalsIgnoreCase(email.trim())
-                        && acc.getWebsite().equalsIgnoreCase(website.trim()));
-        if (duplicate) {
-            throw new ValidationException("An account with this email and website already exists.");
         }
     }
 

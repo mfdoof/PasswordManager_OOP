@@ -44,7 +44,7 @@ class VaultService {
             VaultMetadata metadata = new VaultMetadata();
             metadata.setKdfSalt(salt);
             metadata.setKdfParams(kdfParamsJson);
-            metadata.setMasterHash(masterHash);
+            metadata.setAuthHash(masterHash);
             metadata.setEncVersion(1);
 
             metadataDao.insert(metadata);
@@ -69,7 +69,7 @@ class VaultService {
 
         boolean verified;
         try {
-            verified = PasswordHasher.verifyPassword(masterPassword, meta.getKdfSalt(), meta.getMasterHash());
+            verified = PasswordHasher.verifyPassword(masterPassword, meta.getKdfSalt(), meta.getAuthHash());
             if (!verified) {
                 throw new RuntimeException("Invalid master password");
             }

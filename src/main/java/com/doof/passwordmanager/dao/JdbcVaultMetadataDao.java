@@ -3,24 +3,49 @@ import com.doof.passwordmanager.db.ConnectionManager;
 import com.doof.passwordmanager.model.VaultMetadata;
 
 import java.sql.*;
-import java.time.LocalDateTime;
+import java.time.Clock;
+import java.util.Objects;
 
 public class JdbcVaultMetadataDao implements VaultMetadataDao {
+
+    private final ConnectionManager connectionManager;
+    private final Clock clock;
+
+    public JdbcVaultMetadataDao(ConnectionManager connectionManager) {
+        this(connectionManager, Clock.systemUTC());
+    }
+
+    public JdbcVaultMetadataDao(ConnectionManager connectionManager, Clock clock) {
+        this.connectionManager = Objects.requireNonNull(connectionManager);
+        this.clock = Objects.requireNonNull(clock);
+    }
+
     @Override
     public void insert(VaultMetadata metadata){
-        String sql = "INSERT INTO vault_metadata (kdf_salt, kdf_params, master_hash, enc_version) VALUES (?, ?, ?, ?)";
-        try (Connection conn = ConnectionManager.getConnection();
+        String sql = "INSERT INTO vault_metadata " +
+                "(id, kdf_salt, kdf_params, auth_hash, enc_version, failed_attempts, last_failed_at, created_at, updated_at) " +
+                "VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)";
+        long now = clock.millis();
+
+        try (Connection conn = connectionManager.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setBytes(1, metadata.getKdfSalt());
             ps.setString(2, metadata.getKdfParams());
-            ps.setBytes(3, metadata.getMasterHash());
+            ps.setBytes(3, metadata.getAuthHash());
             ps.setInt(4, metadata.getEncVersion());
+            ps.setInt(5, metadata.getFailedAttempts());
+            setNullableLong(ps, 6, metadata.getLastFailedAt());
+            ps.setLong(7, now);
+            ps.setLong(8, now);
 
             int affected = ps.executeUpdate();
             if (affected != 1) {
                 throw new RuntimeException("Inserting vault metadata failed, no rows affected.");
             }
+            metadata.setCreatedAt(now);
+            metadata.setUpdatedAt(now);
+
         } catch (SQLException e) {
             throw new RuntimeException("Error inserting vault metadata", e);
         }
@@ -28,24 +53,24 @@ public class JdbcVaultMetadataDao implements VaultMetadataDao {
 
     @Override
     public VaultMetadata find() {
-        String sql = "SELECT * FROM vault_metadata WHERE id = 1";
-        try (Connection conn = ConnectionManager.getConnection();
+        String sql = "SELECT kdf_salt, kdf_params, auth_hash, enc_version, failed_attempts, last_failed_at, " +
+                "created_at, updated_at FROM vault_metadata WHERE id = 1";
+
+        try (Connection conn = connectionManager.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
 
             if (rs.next()) {
                 VaultMetadata metadata = new VaultMetadata();
-                metadata.setId(rs.getInt("id"));
                 metadata.setKdfSalt(rs.getBytes("kdf_salt"));
                 metadata.setKdfParams(rs.getString("kdf_params"));
-                metadata.setMasterHash(rs.getBytes("master_hash"));
+                metadata.setAuthHash(rs.getBytes("auth_hash"));
                 metadata.setEncVersion(rs.getInt("enc_version"));
-
-                Timestamp createdTs = rs.getTimestamp("created_at");
-                Timestamp updatedTs = rs.getTimestamp("updated_at");
-                if (createdTs != null) metadata.setCreatedAt(createdTs.toLocalDateTime());
-                if (updatedTs != null) metadata.setUpdatedAt(updatedTs.toLocalDateTime());
-
+                metadata.setFailedAttempts(rs.getInt("failed_attempts"));
+                long lastFailedAt = rs.getLong("last_failed_at");
+                metadata.setLastFailedAt(rs.wasNull() ? null : lastFailedAt);
+                metadata.setCreatedAt(rs.getLong("created_at"));
+                metadata.setUpdatedAt(rs.getLong("updated_at"));
                 return metadata;
             }
 
@@ -59,26 +84,38 @@ public class JdbcVaultMetadataDao implements VaultMetadataDao {
     @Override
     public void update(VaultMetadata metadata){
         String sql = "UPDATE vault_metadata " +
-                "SET kdf_salt=?, kdf_params=?, master_hash=?, enc_version=?, " +
-                "updated_at=CURRENT_TIMESTAMP " +
+                "SET kdf_salt=?, kdf_params=?, auth_hash=?, enc_version=?, " +
+                "failed_attempts=?, last_failed_at=?, updated_at=? " +
                 "WHERE id = 1";
+        long now = clock.millis();
 
-        try (Connection conn = ConnectionManager.getConnection();
+        try (Connection conn = connectionManager.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setBytes(1, metadata.getKdfSalt());
             ps.setString(2, metadata.getKdfParams());
-            ps.setBytes(3, metadata.getMasterHash());
+            ps.setBytes(3, metadata.getAuthHash());
             ps.setInt(4, metadata.getEncVersion());
+            ps.setInt(5, metadata.getFailedAttempts());
+            setNullableLong(ps, 6, metadata.getLastFailedAt());
+            ps.setLong(7, now);
 
             int affected = ps.executeUpdate();
             if (affected != 1) {
                 throw new RuntimeException("Updating vault metadata failed, no rows affected.");
             }
+            metadata.setUpdatedAt(now);
 
         } catch (SQLException e) {
             throw new RuntimeException("Error updating vault metadata", e);
         }
     }
 
+    private static void setNullableLong(PreparedStatement ps, int index, Long value) throws SQLException {
+        if (value == null) {
+            ps.setNull(index, Types.INTEGER);
+        } else {
+            ps.setLong(index, value);
+        }
+    }
 }

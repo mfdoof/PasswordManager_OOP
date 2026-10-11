@@ -1,9 +1,10 @@
 package com.doof.passwordmanager.service;
 
-import com.doof.passwordmanager.dao.JdbcAccountDao;
+import com.doof.passwordmanager.dao.JdbcEntryDao;
 import com.doof.passwordmanager.dao.JdbcVaultMetadataDao;
-import com.doof.passwordmanager.dao.AccountDao;
+import com.doof.passwordmanager.dao.EntryDao;
 import com.doof.passwordmanager.dao.VaultMetadataDao;
+import com.doof.passwordmanager.db.ConnectionManager;
 
 import java.util.List;
 import java.util.Scanner;
@@ -14,10 +15,11 @@ public class ConsolePasswordManager {
     private static final Scanner scanner = new Scanner(System.in);
 
     public static void main(String[] args) {
-        VaultMetadataDao vaultDao = new JdbcVaultMetadataDao();
+        ConnectionManager cm = ConnectionManager.open(ConnectionManager.resolveVaultPath(args));
+        VaultMetadataDao vaultDao = new JdbcVaultMetadataDao(cm);
         VaultService vaultService = new VaultService(vaultDao);
-        AccountDao accountDao = new JdbcAccountDao();
-        AccountService accountService = new AccountService(accountDao, vaultService);
+        EntryDao entryDao = new JdbcEntryDao(cm);
+        AccountService accountService = new AccountService(entryDao, vaultService);
 
         while (true) {
             printMenu();
@@ -89,7 +91,7 @@ public class ConsolePasswordManager {
         System.out.print("Enter password: ");
         char[] pass = scanner.nextLine().toCharArray();
 
-        int id = accountService.addAccount(email, website, pass);
+        long id = accountService.addAccount(email, website, pass);
         Arrays.fill(pass, '\0');
         System.out.println("Account added (ID: " + id + ")");
     }

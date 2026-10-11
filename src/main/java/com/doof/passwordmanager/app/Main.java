@@ -361,9 +361,9 @@ public class Main {
         SwingUtilities.invokeLater(() -> {
             ApplicationConnector connector = null;
             try {
-                connector = AppBootstrap.createProductionConnector();
+                connector = AppBootstrap.createProductionConnector(args);
             } catch (Throwable t) {
-                JOptionPane.showMessageDialog(null, "Warning: Database connection failed. You can still view the UI.\n\n" + t.getMessage(), "Database Warning", JOptionPane.WARNING_MESSAGE);
+                JOptionPane.showMessageDialog(null, "Warning: Could not open the vault file. You can still view the UI.\n\n" + t.getMessage(), "Database Warning", JOptionPane.WARNING_MESSAGE);
             }
 
             Main main = new Main(connector, null);
