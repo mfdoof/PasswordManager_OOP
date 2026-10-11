@@ -104,14 +104,9 @@ CREATE TABLE entries (
 - **Rotation:** change master password → verify old password (same throttling as unlock), new salt, new keys with current default params, re-encrypt all entries (same ids/AAD) and replace metadata in one SQLite transaction; rollback on any failure. Session continues with the new key.
 
 ## 9. TUI design
-Palette: bg `#0d0b14`, text `#e0d7f5`, primary `#a277ff`, dim `#6b5b95`, success `#61ffca`, error `#ff6188`.
+Full spec with wireframes, key bindings and UX rules: [`TUI_DESIGN.md`](TUI_DESIGN.md).
 
-Screens:
-1. **Unlock / Create** — ASCII logo, `> master password:` prompt, attempt counter; create mode adds confirm field + strength bar.
-2. **Vault** — header (lock state + countdown), `/` search bar, entry list, details pane (masked password), keybinding footer + status messages.
-3. **Entry modal** — site/user/password fields, strength bar, generator (length, charsets, `g` regenerate).
-
-Keys: `j/k`/arrows move, `/` search, `a` add, `e` edit, `d` delete (inline `[y/N]` confirm), `s` reveal, `c` copy, `g` generate, `l` lock, `q` quit, `TAB` next field, `ENTER` save, `ESC` cancel.
+Summary: Lanterna, keyboard-only, min 80x24, purple palette (bg `#0d0b14`, text `#e0d7f5`, primary `#a277ff`, dim `#6b5b95`, success `#61ffca`, error `#ff6188`), `NO_COLOR` and `--ascii` fallbacks, no emojis. Screens: Unlock, Create, Vault (list + search + details), Entry modal (with generator), Change password, Help. Idle auto-lock resets on every keypress; lock and quit clear the screen.
 
 ## 10. Threat model (summary)
 | Threat | Mitigation |
@@ -128,5 +123,5 @@ Keys: `j/k`/arrows move, `/` search, `a` add, `e` edit, `d` delete (inline `[y/N
 
 ## 11. Roadmap
 - **Phase 1 – Hardening (done):** Maven → SQLite → crypto → encrypted fields → on-demand decrypt → throttling → rotation → SECURITY.md/README.
-- **Phase 2 – TUI:** Lanterna UI per §9, remove Swing.
+- **Phase 2 – TUI:** Lanterna UI per §9 / `TUI_DESIGN.md`, real idle auto-lock, remove Swing and the console harness.
 - **Phase 3 – Deployment:** homelab deploy, encrypted backups, file-ownership hardening.
