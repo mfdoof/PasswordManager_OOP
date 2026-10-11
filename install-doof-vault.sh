@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # DOOF Vault installer for macOS and Linux.
 #
-#   install.sh                     install or upgrade to the latest release
-#   install.sh --version 2.0.0     install a specific release
-#   install.sh --uninstall         remove the program (never touches ~/.doof: vault and backups)
+#   install-doof-vault.sh                     install or upgrade to the latest release
+#   install-doof-vault.sh --version 2.0.0     install a specific release
+#   install-doof-vault.sh --uninstall         remove the program (never touches ~/.doof: vault and backups)
 #
 # Downloads only from https://github.com/mfdoof/PasswordManager_OOP releases (redirects must stay
 # HTTPS), verifies the jar against the release's SHA256SUMS and installs nothing on a mismatch.
-# Installs ~/.local/share/doof/doof-vault.jar and the launcher ~/.local/bin/doof. Needs Java 17+.
+# Installs ~/.local/share/doof/doof-vault.jar and the launcher ~/.local/bin/doofv. Needs Java 17+.
 # Exit codes: 0 ok, 1 failed (nothing changed), 2 usage error.
 set -euo pipefail
 
@@ -16,26 +16,29 @@ SHARE_DIR="$HOME/.local/share/doof"
 BIN_DIR="$HOME/.local/bin"
 JAR="$SHARE_DIR/doof-vault.jar"
 VERSION_FILE="$SHARE_DIR/VERSION"
-LAUNCHER="$BIN_DIR/doof"
-LAUNCHER_MARK="# DOOF Vault launcher (installed by install.sh)"
+LAUNCHER="$BIN_DIR/doofv"
+LAUNCHER_MARK="# DOOF Vault launcher (installed by install-doof-vault.sh)"
+# Launcher written by the earlier install.sh (command "doof"); removed when found, never otherwise.
+LEGACY_LAUNCHER="$BIN_DIR/doof"
+LEGACY_MARK="# DOOF Vault launcher (installed by install.sh)"
 MIN_JAVA=17
 VERSION_RE='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
 
-say() { printf 'doof install: %s\n' "$*"; }
+say() { printf 'install-doof-vault: %s\n' "$*"; }
 help() {
   cat <<'HELP'
-usage: install.sh [--version X.Y.Z] | --uninstall
+usage: install-doof-vault.sh [--version X.Y.Z] | --uninstall
   (no options)        install or upgrade to the latest release
   --version X.Y.Z     install that release
-  --uninstall         remove ~/.local/bin/doof and ~/.local/share/doof (keeps ~/.doof: vault and backups)
+  --uninstall         remove ~/.local/bin/doofv and ~/.local/share/doof (keeps ~/.doof: vault and backups)
 Downloads from https://github.com/mfdoof/PasswordManager_OOP releases only and verifies SHA256SUMS.
 Exit codes: 0 ok, 1 failed (nothing installed), 2 usage error.
 HELP
 }
-die() { printf 'doof install: error: %s\n' "$*" >&2; exit 1; }
+die() { printf 'install-doof-vault: error: %s\n' "$*" >&2; exit 1; }
 usage_error() {
-  printf 'doof install: %s\n' "$*" >&2
-  printf 'usage: install.sh [--version X.Y.Z] | --uninstall\n' >&2
+  printf 'install-doof-vault: %s\n' "$*" >&2
+  printf 'usage: install-doof-vault.sh [--version X.Y.Z] | --uninstall\n' >&2
   exit 2
 }
 
@@ -59,20 +62,26 @@ expected_sha256() {
   awk -v f="$2" '$2 == f || $2 == "*" f { print $1; exit }' "$1"
 }
 
+# awk reads all input (no early exit), so nothing in the pipe can die of SIGPIPE under pipefail.
 java_major() {
   local out
   out="$("$1" -version 2>&1)" || return 0
-  printf '%s\n' "$out" | awk -F'"' '/version "/ { print $2; exit }' |
+  printf '%s\n' "$out" | awk -F'"' '/version "/ && !seen { seen = 1; print $2 }' |
     awk -F'[.+-]' '{ if ($1 == "1") print $2; else print $1 }'
 }
 
 check_java() {
   local candidate major found=""
   for candidate in "${JAVA_HOME:+$JAVA_HOME/bin/java}" "$(command -v java 2>/dev/null || true)"; do
-    [ -n "$candidate" ] && [ -x "$candidate" ] || continue
+    if [ -z "$candidate" ] || [ ! -x "$candidate" ]; then
+      continue
+    fi
     major="$(java_major "$candidate")"
-    [ -n "$major" ] && found="$found $candidate (Java $major)"
-    if [ -n "$major" ] && [ "$major" -ge "$MIN_JAVA" ] 2>/dev/null; then
+    if [[ ! "$major" =~ ^[0-9]+$ ]]; then
+      continue
+    fi
+    found="$found $candidate (Java $major)"
+    if [ "$major" -ge "$MIN_JAVA" ]; then
       say "using Java $major at $candidate"
       return 0
     fi
@@ -88,7 +97,7 @@ latest_version() {
   url="$(fetch -o /dev/null -w '%{url_effective}' "$REPO_URL/releases/latest")" ||
     die "cannot reach $REPO_URL/releases/latest"
   version="${url##*/tag/v}"
-  printf '%s\n' "$version" | grep -Eq "$VERSION_RE" || die "could not determine the latest version (got: $url)"
+  [[ "$version" =~ $VERSION_RE ]] || die "could not determine the latest version (got: $url)"
   printf '%s\n' "$version"
 }
 
@@ -96,32 +105,42 @@ is_our_launcher() {
   [ -f "$1" ] && grep -qF "$LAUNCHER_MARK" "$1"
 }
 
+remove_legacy_launcher() {
+  if [ -f "$LEGACY_LAUNCHER" ] && grep -qF "$LEGACY_MARK" "$LEGACY_LAUNCHER"; then
+    rm -f "$LEGACY_LAUNCHER"
+    say "removed the old launcher $LEGACY_LAUNCHER (the command is now doofv)"
+  fi
+}
+
 write_launcher() {
-  local tmp="$1/doof"
+  local tmp="$1/doofv"
   cat > "$tmp" <<'DOOF_WRAPPER'
 #!/usr/bin/env bash
-# DOOF Vault launcher (installed by install.sh). Runs the installed jar with Java 17+.
-# Usage: doof [--vault <path>] [--ascii] [--no-color]    terminal UI
-#        doof backup [--vault <path>] [--out <dir>] [--keep N]
+# DOOF Vault launcher (installed by install-doof-vault.sh). Runs the installed jar with Java 17+.
+# Usage: doofv [--vault <path>] [--ascii] [--no-color]    terminal UI
+#        doofv backup [--vault <path>] [--out <dir>] [--keep N]
 set -euo pipefail
 
 DOOF_JAR="${DOOF_JAR:-$HOME/.local/share/doof/doof-vault.jar}"
 MIN_JAVA=17
 
 # Prints the major version of the given java binary, or nothing if it does not run.
+# awk reads all input (no early exit), so nothing in the pipe can die of SIGPIPE under pipefail.
 java_major() {
   local out
   out="$("$1" -version 2>&1)" || return 0
-  printf '%s\n' "$out" | awk -F'"' '/version "/ { print $2; exit }' |
+  printf '%s\n' "$out" | awk -F'"' '/version "/ && !seen { seen = 1; print $2 }' |
     awk -F'[.+-]' '{ if ($1 == "1") print $2; else print $1 }'
 }
 
 find_java() {
   local candidate major
   for candidate in "${JAVA_HOME:+$JAVA_HOME/bin/java}" "$(command -v java 2>/dev/null || true)"; do
-    [ -n "$candidate" ] && [ -x "$candidate" ] || continue
+    if [ -z "$candidate" ] || [ ! -x "$candidate" ]; then
+      continue
+    fi
     major="$(java_major "$candidate")"
-    if [ -n "$major" ] && [ "$major" -ge "$MIN_JAVA" ] 2>/dev/null; then
+    if [[ "$major" =~ ^[0-9]+$ ]] && [ "$major" -ge "$MIN_JAVA" ]; then
       printf '%s\n' "$candidate"
       return 0
     fi
@@ -130,13 +149,13 @@ find_java() {
 }
 
 if [ ! -f "$DOOF_JAR" ]; then
-  echo "doof: $DOOF_JAR not found. Reinstall with install.sh." >&2
+  echo "doofv: $DOOF_JAR not found. Reinstall with install-doof-vault.sh." >&2
   exit 1
 fi
 
 if ! JAVA="$(find_java)"; then
-  echo "doof: Java $MIN_JAVA or newer is required (checked \$JAVA_HOME, then java on PATH)." >&2
-  echo "      Install one, e.g. Temurin: https://adoptium.net  (macOS: brew install --cask temurin)" >&2
+  echo "doofv: Java $MIN_JAVA or newer is required (checked \$JAVA_HOME, then java on PATH)." >&2
+  echo "       Install one, e.g. Temurin: https://adoptium.net  (macOS: brew install --cask temurin)" >&2
   exit 1
 fi
 
@@ -145,6 +164,7 @@ DOOF_WRAPPER
   chmod 755 "$tmp"
   mkdir -p "$BIN_DIR"
   mv -f "$tmp" "$LAUNCHER"
+  remove_legacy_launcher
 }
 
 uninstall() {
@@ -154,6 +174,10 @@ uninstall() {
   elif [ -e "$LAUNCHER" ]; then
     say "left $LAUNCHER alone: it was not installed by this script"
   fi
+  if [ -f "$LEGACY_LAUNCHER" ] && grep -qF "$LEGACY_MARK" "$LEGACY_LAUNCHER"; then
+    removed=1
+  fi
+  remove_legacy_launcher
   for f in "$JAR" "$VERSION_FILE"; do
     if [ -e "$f" ]; then rm -f "$f"; removed=1; say "removed $f"; fi
   done
@@ -193,7 +217,7 @@ main() {
     uninstall
     return 0
   fi
-  if [ -n "$version" ] && ! printf '%s\n' "$version" | grep -Eq "$VERSION_RE"; then
+  if [ -n "$version" ] && [[ ! "$version" =~ $VERSION_RE ]]; then
     usage_error "invalid version: $version (expected X.Y.Z)"
   fi
   if [ -e "$LAUNCHER" ] && ! is_our_launcher "$LAUNCHER"; then
@@ -214,7 +238,7 @@ main() {
   fetch -o "$TMP_DIR/SHA256SUMS" "$base/SHA256SUMS" || die "cannot download SHA256SUMS for $version (does the release exist?)"
   local expected
   expected="$(expected_sha256 "$TMP_DIR/SHA256SUMS" "$name")"
-  printf '%s\n' "$expected" | grep -Eq '^[0-9a-f]{64}$' || die "SHA256SUMS has no valid entry for $name"
+  [[ "$expected" =~ ^[0-9a-f]{64}$ ]] || die "SHA256SUMS has no valid entry for $name"
 
   # Already installed and intact: nothing to download.
   if [ -f "$JAR" ] && [ -f "$VERSION_FILE" ] && [ "$(cat "$VERSION_FILE")" = "$version" ] &&
@@ -241,7 +265,7 @@ main() {
 
   say "installed $JAR and $LAUNCHER"
   path_hint
-  say "run: doof        (vault: ~/.doof/vault.db; backups: doof backup)"
+  say "run: doofv        (vault: ~/.doof/vault.db; backups: doofv backup)"
 }
 
 main "$@"

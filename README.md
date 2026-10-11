@@ -39,27 +39,27 @@ Needs Java 17 or newer (for example [Temurin](https://adoptium.net); macOS: `bre
 Quick install of the latest release:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mfdoof/PasswordManager_OOP/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/mfdoof/PasswordManager_OOP/main/install-doof-vault.sh | bash
 ```
 
 Safer: download the script, read it, then run it:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/mfdoof/PasswordManager_OOP/main/install.sh
-less install.sh
-bash install.sh                    # latest release
-bash install.sh --version 2.0.0    # or a specific one
+curl -fsSLO https://raw.githubusercontent.com/mfdoof/PasswordManager_OOP/main/install-doof-vault.sh
+less install-doof-vault.sh
+bash install-doof-vault.sh                    # latest release
+bash install-doof-vault.sh --version 2.0.0    # or a specific one
 ```
 
 The script downloads `doof-vault-<version>.jar` and `SHA256SUMS` from this repository's GitHub Releases over HTTPS only, verifies the checksum (and installs nothing if it does not match), checks for Java 17+, then installs:
 
 - `~/.local/share/doof/doof-vault.jar` (and a `VERSION` file)
-- `~/.local/bin/doof`, a small launcher that finds Java 17+ (`$JAVA_HOME`, then `PATH`) and runs the jar
+- `~/.local/bin/doofv`, a small launcher that finds Java 17+ (`$JAVA_HOME`, then `PATH`) and runs the jar
 
-If `~/.local/bin` is not on your `PATH`, it tells you the line to add. Then run `doof` (or `doof backup`).
+If `~/.local/bin` is not on your `PATH`, it tells you the line to add. Then run `doofv` (or `doofv backup`).
 
 - **Upgrade:** run the script again; it installs the latest release, or does nothing if that version is already installed and intact.
-- **Uninstall:** `bash install.sh --uninstall` (or `curl -fsSL .../install.sh | bash -s -- --uninstall`). It removes only the launcher and the jar; your vault and backups in `~/.doof` are kept.
+- **Uninstall:** `bash install-doof-vault.sh --uninstall` (or `curl -fsSL .../install-doof-vault.sh | bash -s -- --uninstall`). It removes only the launcher and the jar; your vault and backups in `~/.doof` are kept.
 
 Installer exit codes: 0 ok, 1 failed (nothing installed or changed), 2 usage error.
 
@@ -108,7 +108,7 @@ The order of precedence is `--vault`, then `DOOF_VAULT_PATH`, then `~/.doof/vaul
 ## Backup
 
 ```bash
-doof backup [--vault <path>] [--out <dir>] [--keep N]
+doofv backup [--vault <path>] [--out <dir>] [--keep N]
 # without the installer: java -jar doof-vault-<version>.jar backup ...
 ```
 

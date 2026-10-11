@@ -51,20 +51,34 @@ jobs:
     name: shellcheck
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      # Pinned so CI and local runs agree (the runner's apt shellcheck is older and differs).
+      SHELLCHECK_VERSION: v0.11.0
+      SHELLCHECK_SHA256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      - name: ShellCheck bin/doof and install.sh
+      - name: Install pinned ShellCheck
+        run: |
+          set -euo pipefail
+          f="shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          curl --proto '=https' --proto-redir '=https' -fsSLO \
+            "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/${f}"
+          echo "${SHELLCHECK_SHA256}  ${f}" | sha256sum -c -
+          tar -xJf "${f}"
+          echo "${PWD}/shellcheck-${SHELLCHECK_VERSION}" >> "${GITHUB_PATH}"
+
+      - name: ShellCheck bin/doofv and install-doof-vault.sh
         run: |
           shellcheck --version
-          shellcheck bin/doof install.sh
+          shellcheck bin/doofv install-doof-vault.sh
 
-      - name: Launcher embedded in install.sh matches bin/doof
-        run: diff <(awk "/<<'DOOF_WRAPPER'\$/{f=1;next} /^DOOF_WRAPPER\$/{f=0} f" install.sh) bin/doof
+      - name: Launcher embedded in install-doof-vault.sh matches bin/doofv
+        run: diff <(awk "/<<'DOOF_WRAPPER'\$/{f=1;next} /^DOOF_WRAPPER\$/{f=0} f" install-doof-vault.sh) bin/doofv
 
   install:
-    name: install.sh (${{ matrix.os }})
+    name: install-doof-vault.sh (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     strategy:
@@ -81,14 +95,19 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # Output is captured before grepping: `cmd | grep -q` under pipefail fails when grep exits
+      # early and cmd is killed by SIGPIPE while still writing.
       - name: Install the latest release into a temporary HOME, run it, uninstall
         run: |
           set -euo pipefail
           home="$(mktemp -d)"
-          HOME="$home" bash install.sh
-          HOME="$home" bash install.sh | grep -q "already installed and verified"
-          HOME="$home" "$home/.local/bin/doof" backup --help | grep -q "usage: doof-vault backup"
+          HOME="$home" bash install-doof-vault.sh
+          out="$(HOME="$home" bash install-doof-vault.sh)"
+          grep -q "already installed and verified" <<<"$out"
+          out="$(HOME="$home" "$home/.local/bin/doofv" backup --help)"
+          grep -q "usage: doof-vault backup" <<<"$out"
           mkdir -p "$home/.doof" && echo keep > "$home/.doof/vault.db"
-          HOME="$home" bash install.sh --uninstall
-          test ! -e "$home/.local/bin/doof" && test ! -e "$home/.local/share/doof"
+          HOME="$home" bash install-doof-vault.sh --uninstall
+          test ! -e "$home/.local/bin/doofv"
+          test ! -e "$home/.local/share/doof"
           test -f "$home/.doof/vault.db"
