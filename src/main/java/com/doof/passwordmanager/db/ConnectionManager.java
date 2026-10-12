@@ -66,7 +66,18 @@ public final class ConnectionManager {
 
     /** Vault path from {@code --vault <path>}, then {@code DOOF_VAULT_PATH}, else {@code ~/.doof/vault.db}. */
     public static Path resolveVaultPath(String[] args) {
-        return resolveVaultPath(args, System.getenv(), System.getProperty("user.home"));
+        return resolveVaultPath(args, System.getenv(), userHome(System.getenv()));
+    }
+
+    /**
+     * The user's home: {@code $HOME} when set, else Java's {@code user.home}. Java takes
+     * {@code user.home} from the account database and ignores {@code $HOME}; the launcher and the
+     * installer use {@code $HOME}, so the app does too, or an overridden HOME (sudo, containers,
+     * tests) would silently use the real home directory.
+     */
+    public static String userHome(Map<String, String> env) {
+        String home = env.get("HOME");
+        return home != null && !home.isBlank() ? home : System.getProperty("user.home");
     }
 
     /** Same as {@link #resolveVaultPath(String[])} with explicit environment and home (CLI, tests). */

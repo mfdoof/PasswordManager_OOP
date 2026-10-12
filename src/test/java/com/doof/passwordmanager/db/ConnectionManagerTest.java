@@ -53,6 +53,13 @@ class ConnectionManagerTest {
     }
 
     @Test
+    void homeComesFromTheHomeVariableWhenSet() {
+        assertEquals("/tmp/other-home", ConnectionManager.userHome(Map.of("HOME", "/tmp/other-home")));
+        assertEquals(System.getProperty("user.home"), ConnectionManager.userHome(Map.of()));
+        assertEquals(System.getProperty("user.home"), ConnectionManager.userHome(Map.of("HOME", " ")));
+    }
+
+    @Test
     void vaultArgWithoutValueIsRejected() {
         assertThrows(IllegalArgumentException.class,
                 () -> ConnectionManager.resolveVaultPath(new String[]{"--vault"}, Map.of(), "/home/u"));

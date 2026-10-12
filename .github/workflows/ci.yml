@@ -105,9 +105,20 @@ jobs:
           out="$(HOME="$home" bash install-doof-vault.sh)"
           grep -q "already installed and verified" <<<"$out"
           out="$(HOME="$home" "$home/.local/bin/doofv" backup --help)"
-          grep -q "usage: doof-vault backup" <<<"$out"
+          grep -q "backup \[--vault <path>\]" <<<"$out"  # matches released and current usage text
           mkdir -p "$home/.doof" && echo keep > "$home/.doof/vault.db"
           HOME="$home" bash install-doof-vault.sh --uninstall
           test ! -e "$home/.local/bin/doofv"
           test ! -e "$home/.local/share/doof"
           test -f "$home/.doof/vault.db"
+
+      - name: Validate the systemd user units (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          bash install-doof-vault.sh  # into the runner's own HOME: verify needs %h/.local/bin/doofv to exist
+          systemd-analyze --user verify contrib/systemd/doof-backup.service contrib/systemd/doof-backup.timer
+
+      - name: Validate the launchd agent (macOS)
+        if: runner.os == 'macOS'
+        run: plutil -lint contrib/launchd/quest.doof.vault-backup.plist

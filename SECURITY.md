@@ -68,6 +68,8 @@ After the *n*-th consecutive wrong password, the next attempt must wait `min(1s 
 
 `doof-vault backup` copies the encrypted file (no keys, no master password) and verifies it before pruning older copies. Backups are created `600` in a `700` directory. A backup opens with the master password that was current when it was taken: after changing the master password, older backups still open with the old one, so keep or delete them with that in mind. Treat backups like the vault file itself: anyone who copies one can attempt offline guessing (see [Throttling](#throttling)).
 
+**After a suspected leak** (master password seen by someone, or a copy of `vault.db` or a backup taken): change the master password (`p`), which re-encrypts the vault under a new salt and keys, then delete the old backups, locally and in any synced/NAS/off-machine copies. Old backups still open with the old master password, so a leaked password plus any old backup still exposes the entries as they were then. New backups made after the change use the new password. If you suspect the site passwords themselves were exposed, change them at the sites too.
+
 ## Known limitations
 
 - **JVM key copies.** The JCA (`SecretKeySpec`, cipher state) copies key bytes internally. The app wipes its own arrays but cannot zero those copies; they remain until garbage-collected.

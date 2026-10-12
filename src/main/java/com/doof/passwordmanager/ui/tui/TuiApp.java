@@ -33,17 +33,21 @@ public final class TuiApp {
     public static void main(String[] args) {
         if (args.length > 0 && args[0].equals("backup")) {  // non-interactive subcommand, no terminal UI
             System.exit(BackupCommand.run(java.util.Arrays.copyOfRange(args, 1, args.length), System.getenv(),
-                    System.getProperty("user.home"), java.time.Clock.systemDefaultZone(), System.out, System.err));
+                    ConnectionManager.userHome(System.getenv()), java.time.Clock.systemDefaultZone(), System.out, System.err));
             return;
         }
         TuiOptions options;
         try {
             options = TuiOptions.parse(args);
         } catch (IllegalArgumentException e) {
-            System.err.println("doof-vault: " + e.getMessage());
+            System.err.println("doofv: " + e.getMessage());
             System.err.println(TuiOptions.USAGE);
             System.exit(2);
             return;
+        }
+        if (options.help()) {
+            System.out.println(TuiOptions.USAGE);
+            return;  // exit 0; no vault opened, no terminal touched
         }
         // The clipboard uses AWT; on macOS this keeps it from adding a Dock icon for a terminal app.
         System.setProperty("apple.awt.UIElement", "true");
@@ -64,7 +68,7 @@ public final class TuiApp {
             t.setDaemon(true);
             return t;
         });
-        TuiContext ctx = new TuiContext(connector, displayPath(cm.getVaultPath(), System.getProperty("user.home")),
+        TuiContext ctx = new TuiContext(connector, displayPath(cm.getVaultPath(), ConnectionManager.userHome(System.getenv())),
                 warnings, worker, System::currentTimeMillis, java.time.ZoneId.systemDefault(),
                 new SecureClipboard(() -> AwtClipboardBackend.probe(System.getenv())));
 
