@@ -225,7 +225,12 @@ src/test/java/...  JUnit 5 tests
 
 - [x] **Phase 1: Hardening.** Maven, SQLite, Argon2id + HKDF + AES-GCM, encrypted fields, decrypt on demand, throttling, rotation, docs
 - [x] **Phase 2: TUI.** Lanterna terminal UI (local, SSH, headless), idle auto-lock, clipboard auto-clear, generator, change master password; Swing removed
-- [ ] **Phase 3: Deployment.** Homelab deployment, encrypted backups, file-ownership hardening
+- [x] **Phase 3a: Local deployment.** CI on Linux and macOS, checksummed GitHub Releases, verified one-line installer (`doofv`), `doofv backup`, scheduled backups (launchd / systemd)
+
+### Future work
+
+- **Phase 3b: Homelab deployment.** SSH-only hardened host with the TUI as a forced command, signed releases (cosign), off-site backups and monitoring
+- Demo recording in this README
 
 ## Author
 
