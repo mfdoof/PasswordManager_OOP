@@ -48,7 +48,7 @@ Safer: download the script, read it, then run it:
 curl -fsSLO https://raw.githubusercontent.com/mfdoof/PasswordManager_OOP/main/install-doof-vault.sh
 less install-doof-vault.sh
 bash install-doof-vault.sh                    # latest release
-bash install-doof-vault.sh --version 2.0.0    # or a specific one
+bash install-doof-vault.sh --version 2.0.1    # or a specific one
 ```
 
 The script downloads `doof-vault-<version>.jar` and `SHA256SUMS` from this repository's GitHub Releases over HTTPS only, verifies the checksum (and installs nothing if it does not match), checks for Java 17+, then installs:
@@ -70,7 +70,7 @@ Each release on the [Releases page](https://github.com/mfdoof/PasswordManager_OO
 Download and verify by hand:
 
 ```bash
-VERSION=2.0.0
+VERSION=2.0.1
 BASE=https://github.com/mfdoof/PasswordManager_OOP/releases/download/v$VERSION
 curl -fLO "$BASE/doof-vault-$VERSION.jar"
 curl -fLO "$BASE/SHA256SUMS"

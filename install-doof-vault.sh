@@ -2,7 +2,7 @@
 # DOOF Vault installer for macOS and Linux.
 #
 #   install-doof-vault.sh                     install or upgrade to the latest release
-#   install-doof-vault.sh --version 2.0.0     install a specific release
+#   install-doof-vault.sh --version 2.0.1     install a specific release
 #   install-doof-vault.sh --uninstall         remove the program (never touches ~/.doof: vault and backups)
 #
 # Downloads only from https://github.com/mfdoof/PasswordManager_OOP releases (redirects must stay
