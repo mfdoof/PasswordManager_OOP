@@ -23,6 +23,16 @@ class TuiOptionsTest {
     }
 
     @Test
+    void helpFlagsAreRecognized() {
+        assertTrue(TuiOptions.parse(new String[]{"--help"}).help());
+        assertTrue(TuiOptions.parse(new String[]{"-h"}).help());
+        assertTrue(TuiOptions.parse(new String[]{"--ascii", "-h"}).help());
+        assertFalse(TuiOptions.parse(new String[]{}).help());
+        assertTrue(TuiOptions.USAGE.startsWith("usage: doofv "), TuiOptions.USAGE);
+        assertTrue(TuiOptions.USAGE.contains("-h, --help"));
+    }
+
+    @Test
     void rejectsUnknownArguments() {
         assertThrows(IllegalArgumentException.class, () -> TuiOptions.parse(new String[]{"--colour"}));
         assertThrows(IllegalArgumentException.class, () -> TuiOptions.parse(new String[]{"--swing"}), "Swing UI is gone");

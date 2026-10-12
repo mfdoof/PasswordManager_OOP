@@ -104,6 +104,7 @@ The order of precedence is `--vault`, then `DOOF_VAULT_PATH`, then `~/.doof/vaul
 | `--vault <path>` | vault file to open or create |
 | `--ascii` | plain `+ - \|` borders (also used automatically without a UTF-8 locale) |
 | `--no-color` | monochrome; same as setting `NO_COLOR` |
+| `-h`, `--help` | usage (also `doofv backup --help`) |
 
 ## Backup
 
@@ -120,7 +121,63 @@ Copies the encrypted vault file with SQLite's online backup API (safe while the 
 | 1 | backup failed; no new file kept, nothing pruned |
 | 2 | usage error |
 
-To restore, quit the app and copy a backup over your `vault.db`; it opens with the master password that was current when the backup was taken.
+### Scheduled backups
+
+Ready-made jobs in [`contrib/`](contrib) run `doofv backup` every day at 03:00 (Java must be findable: a JDK installed system-wide, on `PATH`, or set `JAVA_HOME` in the job).
+
+**macOS (launchd).** Logs go to `~/Library/Logs/doof-backup.log`; if the Mac is asleep at 03:00, the job runs when it wakes.
+
+```bash
+curl -fsSLo ~/Library/LaunchAgents/quest.doof.vault-backup.plist \
+  https://raw.githubusercontent.com/mfdoof/PasswordManager_OOP/main/contrib/launchd/quest.doof.vault-backup.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/quest.doof.vault-backup.plist   # enable
+launchctl kickstart -p gui/$(id -u)/quest.doof.vault-backup                            # run once now
+tail ~/Library/Logs/doof-backup.log                                                     # check
+launchctl print gui/$(id -u)/quest.doof.vault-backup | grep -E 'state|last exit code'
+
+launchctl bootout gui/$(id -u)/quest.doof.vault-backup                                  # disable
+rm ~/Library/LaunchAgents/quest.doof.vault-backup.plist
+```
+
+**Linux (systemd user timer).** Output goes to the journal; `Persistent=true` catches up on a missed run after the machine was off.
+
+```bash
+mkdir -p ~/.config/systemd/user
+curl -fsSLo ~/.config/systemd/user/doof-backup.service https://raw.githubusercontent.com/mfdoof/PasswordManager_OOP/main/contrib/systemd/doof-backup.service
+curl -fsSLo ~/.config/systemd/user/doof-backup.timer   https://raw.githubusercontent.com/mfdoof/PasswordManager_OOP/main/contrib/systemd/doof-backup.timer
+systemctl --user daemon-reload
+systemctl --user enable --now doof-backup.timer      # enable
+systemctl --user start doof-backup.service           # run once now
+systemctl --user list-timers doof-backup.timer       # next run
+journalctl --user -u doof-backup.service -n 20       # check
+
+systemctl --user disable --now doof-backup.timer     # disable
+rm ~/.config/systemd/user/doof-backup.service ~/.config/systemd/user/doof-backup.timer
+systemctl --user daemon-reload
+```
+
+User timers only run while you are logged in; to run them regardless, enable lingering once: `sudo loginctl enable-linger "$USER"`.
+
+### Restore
+
+1. Quit DOOF Vault (`q`) and make sure it is not running (`pgrep -f doof-vault.jar` prints nothing).
+2. Pick a backup: `ls ~/.doof/backups`.
+3. Keep the current vault aside, and move away a leftover journal file if there is one (SQLite would otherwise try to apply it to the restored file):
+   ```bash
+   cd ~/.doof
+   cp -p vault.db vault.db.before-restore
+   [ -e vault.db-journal ] && mv vault.db-journal vault.db-journal.before-restore
+   ```
+4. Copy the backup over the vault and make it owner-only:
+   ```bash
+   cp backups/vault-YYYYMMDD-HHMMSS.db vault.db
+   chmod 600 vault.db
+   ```
+5. Run `doofv` and unlock with the master password that was current when that backup was taken. When everything looks right, delete `vault.db.before-restore`.
+
+### Off-machine copies
+
+A backup on the same disk does not survive losing the machine. No extra tooling is built in; either point `--out` at a folder that is synced or on a NAS (for example `doofv backup --out /Volumes/nas/doof-backups`, or a synced folder; `--keep` prunes per folder), or include `~/.doof/backups` in an existing backup tool such as [restic](https://restic.net). Backups are encrypted, but anyone who gets one can attempt offline guessing, so keep them somewhere private.
 
 ## Keys
 

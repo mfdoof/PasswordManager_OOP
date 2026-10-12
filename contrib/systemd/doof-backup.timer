@@ -1,0 +1,13 @@
+# Daily trigger for doof-backup.service (systemd user timer).
+# Persistent=true runs a missed backup at the next start if the machine was off at 03:00.
+[Unit]
+Description=Daily DOOF Vault backup
+Documentation=https://github.com/mfdoof/PasswordManager_OOP#scheduled-backups
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+RandomizedDelaySec=15min
+
+[Install]
+WantedBy=timers.target

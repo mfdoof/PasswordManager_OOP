@@ -256,12 +256,17 @@ class BackupCommandTest {
         assertEquals(BackupCommand.USAGE, run("--vault="));
         assertEquals(BackupCommand.USAGE, run("--force"));
         assertTrue(err().contains("unknown argument: --force"));
-        assertTrue(err().contains("usage: doof-vault backup"));
+        assertTrue(err().contains("usage: doofv backup"));
     }
 
     @Test
-    void helpPrintsUsageAndExitCodes() {
-        assertEquals(BackupCommand.OK, run("--help"));
-        assertTrue(out().contains("Exit codes: 0 ok, 1 backup failed"), out());
+    void helpPrintsUsageToStdoutAndExitsZero() {
+        for (String flag : new String[]{"--help", "-h"}) {
+            assertEquals(BackupCommand.OK, run(flag), flag);
+            assertTrue(out().startsWith("usage: doofv backup"), out());
+            assertTrue(out().contains("Exit codes: 0 ok, 1 backup failed"), out());
+            assertEquals("", err(), "nothing on stderr for " + flag);
+        }
+        assertEquals(BackupCommand.OK, run("--keep", "3", "-h"), "help wins over other options");
     }
 }

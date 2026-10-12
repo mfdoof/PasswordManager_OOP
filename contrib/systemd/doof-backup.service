@@ -1,0 +1,16 @@
+# DOOF Vault backup (systemd user service), started daily by doof-backup.timer.
+# Install: see README "Scheduled backups". Output goes to the journal:
+#   journalctl --user -u doof-backup.service
+[Unit]
+Description=DOOF Vault backup (encrypted copy of ~/.doof/vault.db)
+Documentation=https://github.com/mfdoof/PasswordManager_OOP#scheduled-backups
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/doofv backup
+# If Java is not on the default PATH, point the launcher at a JDK:
+#Environment=JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64
+UMask=0077
+NoNewPrivileges=true
+Nice=10
+IOSchedulingClass=idle

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Daily DOOF Vault backup at 03:00 (macOS user agent). Install:
+    cp contrib/launchd/quest.doof.vault-backup.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/quest.doof.vault-backup.plist
+  launchd does not expand ~ or $HOME in paths, so the job runs through /bin/sh, which does.
+  Output (with a timestamp per run) is appended to ~/Library/Logs/doof-backup.log.
+  If the Mac is asleep at 03:00, the job runs when it wakes.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>quest.doof.vault-backup</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>{ date '+%Y-%m-%d %H:%M:%S'; "$HOME/.local/bin/doofv" backup; } >> "$HOME/Library/Logs/doof-backup.log" 2>&amp;1</string>
+    </array>
+
+    <!-- launchd's default PATH is minimal; add Homebrew so a Java installed there is found.
+         Or set JAVA_HOME here to a specific JDK. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>3</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+    <key>ProcessType</key>
+    <string>Background</string>
+    <key>LowPriorityIO</key>
+    <true/>
+    <key>Nice</key>
+    <integer>10</integer>
+</dict>
+</plist>
