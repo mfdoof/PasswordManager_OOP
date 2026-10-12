@@ -29,7 +29,7 @@ Terminal UI built with Lanterna (Phase 2, implemented). It replaced the Swing UI
 |                      ##   ## ##   ## ##   ## ##                             |
 |                      ##   ## ##   ## ##   ## #####                          |
 |                      ##   ## ##   ## ##   ## ##                             |
-|                      ######   #####   #####  ##        vault v2.0.0         |
+|                      ######   #####   #####  ##        vault v2.0.1         |
 |                                                                              |
 |                +- unlock ----------------------------------+                |
 |                |                                           |                |
